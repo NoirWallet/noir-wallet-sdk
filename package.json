@@ -1,0 +1,60 @@
+{
+  "name": "@noir-wallet/sdk",
+  "version": "0.1.1",
+  "description": "TypeScript SDK for Noir Wallet dApp integration",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./chains/zcash": {
+      "types": "./dist/chains/zcash/index.d.ts",
+      "import": "./dist/chains/zcash/index.mjs",
+      "require": "./dist/chains/zcash/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist",
+    "dev": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --watch",
+    "type-check": "tsc --noEmit",
+    "pack:dry": "npm pack --dry-run",
+    "example:dev": "pnpm --filter @noir-wallet/example dev",
+    "example:build": "pnpm --filter @noir-wallet/example build"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "noir",
+    "wallet",
+    "multi-chain",
+    "zcash",
+    "dapp",
+    "web3",
+    "crypto"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Noir Finance",
+  "license": "MIT",
+  "dependencies": {
+    "bs58": "^6.0.0",
+    "hash.js": "^1.1.7"
+  },
+  "private": false,
+  "packageManager": "pnpm@10.22.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
