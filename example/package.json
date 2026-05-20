@@ -1,13 +1,14 @@
 {
   "name": "@noir-wallet/example",
-  "version": "0.1.0",
-  "description": "DApp integration example for Noir Wallet",
+  "version": "0.1.1",
+  "description": "SDK integration example for Noir Wallet",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@noir-wallet/sdk": "workspace:*",

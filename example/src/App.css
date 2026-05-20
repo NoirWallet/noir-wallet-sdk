@@ -28,20 +28,46 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
-.logo-icon {
-  font-size: 28px;
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
 }
 
-.logo h1 {
+.logo-img {
+  height: 28px;
+  width: 30px;
+  object-fit: contain;
+}
+
+.logo-text {
+  font-family: serif;
   font-size: 20px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--color-primary), #fff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.logo-noir {
+  color: #fff;
+}
+
+.logo-wallet {
+  color: var(--color-primary);
+}
+
+.logo-badge {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: rgba(0, 209, 138, 0.1);
+  padding: 3px 10px;
+  border-radius: 100px;
 }
 
 /* Main Content */

@@ -180,20 +180,29 @@ console.log('Available:', balance.available, 'ZEC') // Recommended for max send 
 - `total`: Total balance (transparent + shielded)
 - `available`: **Precise transferable amount** - Maximum amount that can be sent considering UTXO selection, dynamic fees, and dust threshold. Calculated during background sync using WASM's `get_max_transferable_amount` method.
 
-#### `getPublicKey()`
+#### `getPublicKey(options?)`
 
 Get the public key of the transparent address.
 
-**Returns**: `Promise<{ pubkey: string, address: string } | null>` - Public key info if connected and unlocked, null if locked
+**Params** (optional):
+
+- `options.signingMode`: `'current'` (default) or `'derived'`
+
+**Returns**: `Promise<{ pubkey: string, address: string, signingMode: SigningMode, originAddress?: string } | null>`
+
+- `pubkey`: Hex-encoded public key
+- `address`: Transparent address corresponding to the key
+- `signingMode`: The actual signing mode used
+- `originAddress`: (only in `'derived'` mode) The user's main transparent address
 
 ```typescript
+// Default: current transparent address key
 const publicKeyInfo = await zcash.getPublicKey()
-if (publicKeyInfo) {
-  console.log('Public Key:', publicKeyInfo.pubkey)
-  console.log('Address:', publicKeyInfo.address)
-} else {
-  console.log('Wallet is locked')
-}
+
+// Derived: privacy-preserving key (unlinkable to main address)
+const derivedKey = await zcash.getPublicKey({ signingMode: 'derived' })
+console.log('Derived Key:', derivedKey.pubkey)
+console.log('Main Address:', derivedKey.originAddress)
 ```
 
 **Note**: This method requires the wallet to be connected but does not trigger an unlock popup. Returns `null` if the wallet is locked.
@@ -218,23 +227,32 @@ const txid = await zcash.sendTransaction({
 })
 ```
 
-#### `signMessage(message)`
+#### `signMessage(message, options?)`
 
-Sign a message with the transparent address.
+Sign a message with a transparent address key.
 
-**Params**: `message: string` - Message to sign
+**Params**:
 
-**Returns**: `Promise<{ signature: string, pubkey: string, address: string }>`
+- `message: string` - Message to sign
+- `options.signingMode`: `'current'` (default) or `'derived'`
+
+**Returns**: `Promise<SignMessageResult>`
 
 - `signature`: Hex-encoded ECDSA signature
 - `pubkey`: Hex-encoded public key
 - `address`: Transparent address used for signing
-
-**Note**: Message signing currently only supports transparent addresses.
+- `signingMode`: The actual signing mode used
+- `originAddress`: (only in `'derived'` mode) The user's main transparent address
 
 ```typescript
+// Default: sign with current transparent address key
 const result = await zcash.signMessage('Hello World')
-console.log('Signature:', result.signature)
+
+// Derived: sign with a privacy-preserving derived key
+// Recommended for identity binding (MCA, DID) to prevent on-chain asset linkage
+const derived = await zcash.signMessage('Hello World', { signingMode: 'derived' })
+console.log('Signature:', derived.signature)
+console.log('Origin Address:', derived.originAddress)
 ```
 
 #### `switchNetwork(network)`
@@ -320,10 +338,18 @@ interface SendTransactionParams {
   amount: string
 }
 
+type SigningMode = 'derived' | 'current'
+
+interface SignMessageOptions {
+  signingMode?: SigningMode // Default: 'current'
+}
+
 interface SignMessageResult {
   signature: string // Hex-encoded ECDSA signature
   pubkey: string // Hex-encoded public key
   address: string // Transparent address used for signing
+  signingMode: SigningMode // Actual signing mode used
+  originAddress?: string // Main transparent address (only in 'derived' mode)
 }
 
 type Network = 'mainnet' | 'testnet'

@@ -19,4 +19,9 @@ export interface ProviderRpcError extends Error {
   data?: unknown
 }
 
-export type { RequestArguments } from './chains/zcash/types'
+export type {
+  RequestArguments,
+  SigningMode,
+  SignMessageOptions,
+  SignMessageResult
+} from './chains/zcash/types'

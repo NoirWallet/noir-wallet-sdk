@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
-// https://vitejs.dev/config/
 export default defineConfig({
+  base: '/example/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -11,10 +11,10 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5174,
-    open: true,
+    host: 'localhost',
+    port: 5002,
+    strictPort: true,
     headers: {
-      // Allow extension to inject scripts via blob: URLs
       'Content-Security-Policy':
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://localhost:* http://127.0.0.1:*; object-src 'self'; connect-src 'self' http://localhost:* ws://localhost:*;"
     }

@@ -3,7 +3,10 @@ import type {
   ZcashAddress,
   Balance,
   SendTransactionParams,
+  SignMessageOptions,
   SignMessageResult,
+  SigningMode,
+  LendingMcaStatus,
   Network
 } from './types'
 
@@ -26,8 +29,17 @@ export class ZcashAPI {
     return this.provider.request({ method: 'zcash_getBalance' })
   }
 
-  async getPublicKey(): Promise<{ pubkey: string; address: string } | null> {
-    return this.provider.request({ method: 'zcash_getPublicKey' })
+  async getPublicKey(options?: SignMessageOptions): Promise<{
+    pubkey: string
+    address: string
+    signingMode: SigningMode
+    originAddress?: string
+  } | null> {
+    const signingMode = options?.signingMode ?? 'current'
+    return this.provider.request({
+      method: 'zcash_getPublicKey',
+      params: [{ signingMode }]
+    })
   }
 
   async sendTransaction(params: SendTransactionParams): Promise<string> {
@@ -37,10 +49,11 @@ export class ZcashAPI {
     })
   }
 
-  async signMessage(message: string): Promise<SignMessageResult> {
+  async signMessage(message: string, options?: SignMessageOptions): Promise<SignMessageResult> {
+    const signingMode = options?.signingMode ?? 'current'
     return this.provider.request({
       method: 'zcash_signMessage',
-      params: [message]
+      params: [message, { signingMode }]
     })
   }
 
@@ -49,6 +62,10 @@ export class ZcashAPI {
       method: 'zcash_switchNetwork',
       params: [{ network }]
     })
+  }
+
+  async checkLendingMcaAccount(): Promise<LendingMcaStatus | null> {
+    return this.provider.request({ method: 'zcash_checkLendingMcaAccount' })
   }
 
   async disconnect(): Promise<void> {

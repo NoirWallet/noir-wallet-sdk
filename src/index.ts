@@ -23,5 +23,7 @@ export type {
   SendTransactionParams,
   TransactionReceipt,
   SignMessageResult,
+  LendingMcaStatus,
+  LendingSigningMode,
   Network
 } from './chains/zcash'

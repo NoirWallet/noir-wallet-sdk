@@ -8,13 +8,6 @@ import {
 } from '@noir-wallet/sdk'
 import './App.css'
 
-interface VersionInfo {
-  version: string
-  filename: string
-  downloadUrl: string
-  buildTime: string
-}
-
 function App() {
   const noirWallet = useMemo(() => getNoirWallet(), [])
   const isInstalled = !!noirWallet
@@ -23,14 +16,13 @@ function App() {
   const [balance, setBalance] = useState<Balance | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showInstallGuide, setShowInstallGuide] = useState(false)
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
 
   const [sendForm, setSendForm] = useState({ to: '', amount: '' })
   const [sending, setSending] = useState(false)
   const [txResult, setTxResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const [signForm, setSignForm] = useState({ message: '' })
+  const [signMode, setSignMode] = useState<'current' | 'derived'>('current')
   const [signing, setSigning] = useState(false)
   const [signResult, setSignResult] = useState<{
     success: boolean
@@ -41,8 +33,11 @@ function App() {
   const [publicKeyInfo, setPublicKeyInfo] = useState<{
     pubkey: string
     address: string
+    signingMode?: string
+    originAddress?: string
   } | null>(null)
   const [loadingPublicKey, setLoadingPublicKey] = useState(false)
+  const [pubKeyMode, setPubKeyMode] = useState<'current' | 'derived'>('current')
 
   const [convertForm, setConvertForm] = useState({ pubkey: '' })
   const [convertResult, setConvertResult] = useState<{
@@ -79,13 +74,6 @@ function App() {
     autoConnect()
   }, [noirWallet])
 
-  useEffect(() => {
-    fetch('/extension/version.json')
-      .then(res => res.json())
-      .then(data => setVersionInfo(data))
-      .catch(() => console.warn('Version info not available'))
-  }, [])
-
   const autoConnect = async () => {
     try {
       const zcash = noirWallet?.zcash
@@ -94,18 +82,14 @@ function App() {
       if (accounts) {
         setConnected(true)
         setAddresses(accounts)
-
-        // Add error handling for balance fetch
         try {
           const balance = await zcash.getBalance()
           setBalance(balance || { transparent: '0', shielded: '0' })
         } catch (balanceError) {
           console.warn('Balance fetch failed during autoConnect:', balanceError)
-          // Set zero balance instead of failing
           setBalance({ transparent: '0', shielded: '0' })
         }
       } else {
-        // Explicitly set disconnected state
         setConnected(false)
         setAddresses(null)
         setBalance(null)
@@ -122,12 +106,10 @@ function App() {
     if (!noirWallet) return
     setLoading(true)
     setError(null)
-
     try {
       const accounts = await noirWallet.zcash.connect()
       setConnected(true)
       setAddresses(accounts)
-
       const balance = await noirWallet.zcash.getBalance()
       setBalance(balance)
     } catch (err: any) {
@@ -145,7 +127,6 @@ function App() {
         console.error('Disconnect failed:', error)
       }
     }
-
     setConnected(false)
     setAddresses(null)
     setBalance(null)
@@ -164,26 +145,18 @@ function App() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!noirWallet || !sendForm.to || !sendForm.amount) return
-
     setSending(true)
     setTxResult(null)
-
     try {
       const txid = await noirWallet.zcash.sendTransaction({
         to: sendForm.to,
         amount: sendForm.amount
       })
-      setTxResult({
-        success: true,
-        message: `Transaction Successful! TXID: ${txid}`
-      })
+      setTxResult({ success: true, message: `Transaction Successful! TXID: ${txid}` })
       setSendForm({ to: '', amount: '' })
       await refreshBalance()
     } catch (err: any) {
-      setTxResult({
-        success: false,
-        message: err.message || 'Transaction Failed'
-      })
+      setTxResult({ success: false, message: err.message || 'Transaction Failed' })
     } finally {
       setSending(false)
     }
@@ -192,39 +165,29 @@ function App() {
   const handleSign = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!noirWallet || !signForm.message) return
-
     setSigning(true)
     setSignResult(null)
-
     try {
-      const result = await noirWallet.zcash.signMessage(signForm.message)
+      const result = await noirWallet.zcash.signMessage(signForm.message, { signingMode: signMode })
       setSignResult({
         success: true,
-        message: 'Message signed successfully!',
+        message: `Message signed successfully! (mode: ${result.signingMode})`,
         data: result
       })
     } catch (err: any) {
-      setSignResult({
-        success: false,
-        message: err.message || 'Signing Failed'
-      })
+      setSignResult({ success: false, message: err.message || 'Signing Failed' })
     } finally {
       setSigning(false)
     }
   }
 
-  const formatBalance = (value: string) => {
-    const num = parseFloat(value)
-    return num.toFixed(8)
-  }
+  const formatBalance = (value: string) => parseFloat(value).toFixed(8)
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedAddress(type)
-      setTimeout(() => {
-        setCopiedAddress(null)
-      }, 2000)
+      setTimeout(() => setCopiedAddress(null), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
     }
@@ -232,10 +195,9 @@ function App() {
 
   const handleGetPublicKey = async () => {
     if (!noirWallet) return
-
     setLoadingPublicKey(true)
     try {
-      const result = await noirWallet.zcash.getPublicKey()
+      const result = await noirWallet.zcash.getPublicKey({ signingMode: pubKeyMode })
       setPublicKeyInfo(result)
     } catch (err: any) {
       console.error('Get public key failed:', err)
@@ -248,35 +210,12 @@ function App() {
   const handleConvertPubkey = (e: React.FormEvent) => {
     e.preventDefault()
     if (!convertForm.pubkey) return
-
     try {
       const address = publicKeyToAddress(convertForm.pubkey, 'mainnet')
-      setConvertResult({
-        success: true,
-        address
-      })
+      setConvertResult({ success: true, address })
     } catch (err: any) {
-      setConvertResult({
-        success: false,
-        error: err.message || 'Conversion failed'
-      })
+      setConvertResult({ success: false, error: err.message || 'Conversion failed' })
     }
-  }
-
-  const handleDownloadExtension = () => {
-    if (versionInfo) {
-      // Use R2 CDN URL instead of local path
-      window.open(versionInfo.downloadUrl, '_blank', 'noopener,noreferrer')
-      setShowInstallGuide(true)
-    }
-  }
-
-  const handleOpenStore = () => {
-    window.open(
-      'https://chromewebstore.google.com/detail/noir-wallet/coming-soon',
-      '_blank',
-      'noopener,noreferrer'
-    )
   }
 
   return (
@@ -284,8 +223,14 @@ function App() {
       <header className="header">
         <div className="header-content">
           <div className="logo">
-            <span className="logo-icon">⚡</span>
-            <h1>Noir Wallet DApp Example</h1>
+            <a href="/" className="logo-link">
+              <img src="/example/logo.png" alt="Noir Wallet" className="logo-img" />
+              <span className="logo-text">
+                <span className="logo-noir">Noir </span>
+                <span className="logo-wallet">Wallet</span>
+              </span>
+            </a>
+            <span className="logo-badge">SDK Example</span>
           </div>
           <div className="header-status">
             {!isInstalled && <span className="status-badge disconnected">Wallet Not Detected</span>}
@@ -302,83 +247,8 @@ function App() {
 
         {!isInstalled && (
           <div className="card install-prompt">
-            <h2>🔒 Install Noir Wallet</h2>
-            <p>Choose an installation method to get started:</p>
-
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}
-            >
-              <div
-                style={{
-                  borderRadius: '8px',
-                  padding: '16px'
-                }}
-              >
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>📦 Install Latest Build</h3>
-                <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#666' }}>
-                  Download the latest build for testing
-                  {versionInfo && ` (v${versionInfo.version})`}
-                </p>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleDownloadExtension}
-                  disabled={!versionInfo}
-                >
-                  {versionInfo ? 'Download Extension' : 'Loading...'}
-                </button>
-              </div>
-
-              <div
-                style={{
-                  borderRadius: '8px',
-                  padding: '16px'
-                }}
-              >
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>🏪 Chrome Web Store</h3>
-                <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#666' }}>
-                  Coming Soon - Official store release
-                </p>
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleOpenStore}
-                  disabled
-                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                >
-                  View Store Page
-                </button>
-              </div>
-            </div>
-
-            {showInstallGuide && (
-              <details style={{ marginTop: '20px' }}>
-                <summary style={{ cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}>
-                  📖 Installation Guide
-                </summary>
-                <ol
-                  style={{
-                    marginTop: '12px',
-                    paddingLeft: '20px',
-                    lineHeight: '1.8',
-                    fontSize: '14px'
-                  }}
-                >
-                  <li>Unzip the downloaded file to a folder</li>
-                  <li>
-                    Open Chrome and navigate to{' '}
-                    <code
-                      style={{ background: '#f0f0f0', padding: '2px 6px', borderRadius: '4px' }}
-                    >
-                      chrome://extensions
-                    </code>
-                  </li>
-                  <li>Enable "Developer mode" in the top right corner</li>
-                  <li>Click "Load unpacked" button</li>
-                  <li>Select the unzipped extension folder</li>
-                  <li>Noir Wallet should now appear in your extensions</li>
-                  <li>Refresh this page to connect</li>
-                </ol>
-              </details>
-            )}
+            <h2>🔒 Wallet Not Detected</h2>
+            <p>Install the Noir Wallet extension to use this example.</p>
           </div>
         )}
 
@@ -408,7 +278,6 @@ function App() {
                   Disconnect
                 </button>
               </div>
-
               <div className="account-addresses">
                 <div className="address-item">
                   <label className="label">Transparent Address</label>
@@ -454,7 +323,6 @@ function App() {
                   Refresh
                 </button>
               </div>
-
               <div className="balance-grid">
                 <div className="balance-item">
                   <span className="balance-label">Transparent</span>
@@ -488,14 +356,12 @@ function App() {
                   ZEC
                 </strong>
               </p>
-
               {balance && parseFloat(balance.transparent) > 0 && (
                 <div className="message warning" style={{ marginBottom: '12px' }}>
                   ⚠️ You have {formatBalance(balance.transparent)} ZEC in transparent balance which
                   cannot be used for sending. Please shield it in the wallet extension first.
                 </div>
               )}
-
               <form onSubmit={handleSend} className="send-form">
                 <div className="form-group">
                   <label className="label">Recipient Address</label>
@@ -508,7 +374,6 @@ function App() {
                     required
                   />
                 </div>
-
                 <div className="form-group">
                   <label className="label">Amount (ZEC)</label>
                   <input
@@ -522,7 +387,6 @@ function App() {
                     required
                   />
                 </div>
-
                 <button
                   type="submit"
                   className="btn btn-primary btn-full"
@@ -538,7 +402,6 @@ function App() {
                   )}
                 </button>
               </form>
-
               {txResult && (
                 <div className={`message ${txResult.success ? 'success' : 'error'}`}>
                   {txResult.message}
@@ -549,7 +412,23 @@ function App() {
             <div className="card sign-card">
               <h2>🔑 Public Key</h2>
               <p className="card-hint">Get the public key of your transparent address</p>
-
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="label">Signing Mode</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className={`btn btn-sm ${pubKeyMode === 'current' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPubKeyMode('current')}
+                  >
+                    Current
+                  </button>
+                  <button
+                    className={`btn btn-sm ${pubKeyMode === 'derived' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPubKeyMode('derived')}
+                  >
+                    Derived (Privacy)
+                  </button>
+                </div>
+              </div>
               <button
                 className="btn btn-primary btn-full"
                 onClick={handleGetPublicKey}
@@ -562,10 +441,9 @@ function App() {
                     Loading...
                   </>
                 ) : (
-                  'Get Public Key'
+                  `Get Public Key (${pubKeyMode})`
                 )}
               </button>
-
               {publicKeyInfo && (
                 <div className="signature-result">
                   <div className="result-item">
@@ -606,6 +484,35 @@ function App() {
                       </button>
                     </div>
                   </div>
+                  {publicKeyInfo.signingMode && (
+                    <div className="result-item">
+                      <label className="label">Signing Mode:</label>
+                      <code className="result-code">{publicKeyInfo.signingMode}</code>
+                    </div>
+                  )}
+                  {publicKeyInfo.originAddress && (
+                    <div className="result-item">
+                      <label className="label">Origin Address (main):</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <code className="result-code" style={{ flex: 1 }}>
+                          {publicKeyInfo.originAddress}
+                        </code>
+                        <button
+                          className="copy-btn"
+                          onClick={() =>
+                            copyToClipboard(publicKeyInfo.originAddress!, 'origin-address')
+                          }
+                          title="Copy origin address"
+                        >
+                          {copiedAddress === 'origin-address' ? (
+                            <span className="copied">✓</span>
+                          ) : (
+                            <span>📋</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -613,7 +520,6 @@ function App() {
             <div className="card sign-card">
               <h2>🔄 Convert Public Key to Address</h2>
               <p className="card-hint">Convert any public key to transparent address (mainnet)</p>
-
               <form onSubmit={handleConvertPubkey} className="sign-form">
                 <div className="form-group">
                   <label className="label">Public Key (hex)</label>
@@ -626,7 +532,6 @@ function App() {
                     required
                   />
                 </div>
-
                 <button
                   type="submit"
                   className="btn btn-primary btn-full"
@@ -635,7 +540,6 @@ function App() {
                   Convert to Address
                 </button>
               </form>
-
               {convertResult && (
                 <div className={`message ${convertResult.success ? 'success' : 'error'}`}>
                   {convertResult.success ? (
@@ -671,9 +575,27 @@ function App() {
 
             <div className="card sign-card">
               <h2>✍️ Sign Message</h2>
-              <p className="card-hint">Note: Message signing uses the transparent address</p>
-
+              <p className="card-hint">Sign a message using the transparent address key</p>
               <form onSubmit={handleSign} className="sign-form">
+                <div className="form-group">
+                  <label className="label">Signing Mode</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${signMode === 'current' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setSignMode('current')}
+                    >
+                      Current
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${signMode === 'derived' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setSignMode('derived')}
+                    >
+                      Derived (Privacy)
+                    </button>
+                  </div>
+                </div>
                 <div className="form-group">
                   <label className="label">Message to Sign</label>
                   <textarea
@@ -685,7 +607,6 @@ function App() {
                     required
                   />
                 </div>
-
                 <button
                   type="submit"
                   className="btn btn-primary btn-full"
@@ -697,11 +618,10 @@ function App() {
                       Signing...
                     </>
                   ) : (
-                    'Sign Message'
+                    `Sign Message (${signMode})`
                   )}
                 </button>
               </form>
-
               {signResult && (
                 <div className={`message ${signResult.success ? 'success' : 'error'}`}>
                   <div>{signResult.message}</div>
@@ -719,6 +639,16 @@ function App() {
                         <label className="label">Address:</label>
                         <code className="result-code">{signResult.data.address}</code>
                       </div>
+                      <div className="result-item">
+                        <label className="label">Signing Mode:</label>
+                        <code className="result-code">{signResult.data.signingMode}</code>
+                      </div>
+                      {signResult.data.originAddress && (
+                        <div className="result-item">
+                          <label className="label">Origin Address (main):</label>
+                          <code className="result-code">{signResult.data.originAddress}</code>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -729,8 +659,8 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Noir Wallet DApp Integration Example</p>
-        <p className="footer-hint">A sample DApp demonstrating Noir Wallet integration</p>
+        <p>Noir Wallet SDK Example</p>
+        <p className="footer-hint">Developer integration testing</p>
       </footer>
     </div>
   )

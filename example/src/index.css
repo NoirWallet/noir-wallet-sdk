@@ -1,24 +1,24 @@
 /* Global Styles */
 :root {
   /* Theme Colors */
-  --color-primary: #f4b728;
-  --color-primary-hover: #d9a323;
-  --color-primary-light: rgba(244, 183, 40, 0.1);
+  --color-primary: #00d18a;
+  --color-primary-hover: #00b878;
+  --color-primary-light: rgba(0, 209, 138, 0.1);
   --color-secondary: #3b82f6;
   --color-success: #22c55e;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
 
   /* Background Colors */
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #141414;
-  --bg-tertiary: #1f1f1f;
-  --bg-card: rgba(30, 30, 30, 0.8);
+  --bg-primary: #12121c;
+  --bg-secondary: #15151f;
+  --bg-tertiary: #1e1e2a;
+  --bg-card: rgba(30, 30, 42, 0.8);
 
   /* Text Colors */
   --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --text-muted: #666666;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
 
   /* Borders */
   --border-color: rgba(255, 255, 255, 0.1);
@@ -40,7 +40,7 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(244, 183, 40, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 209, 138, 0.3);
 }
 
 * {

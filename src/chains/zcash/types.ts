@@ -36,10 +36,34 @@ export interface TransactionReceipt {
   timestamp: number
 }
 
+export type SigningMode = 'derived' | 'current'
+
+export interface SignMessageOptions {
+  /**
+   * Signing mode for message signing.
+   * - `'current'` (default): Signs with the main transparent address key.
+   * - `'derived'`: Signs with a privacy-preserving derived key (m/44'/133'/2147483647'/0/0),
+   *   cryptographically unlinkable to the main address. Recommended for identity binding
+   *   (e.g. MCA creation) to prevent on-chain linkage.
+   */
+  signingMode?: SigningMode
+}
+
 export interface SignMessageResult {
   signature: string
   pubkey: string
   address: string
+  signingMode: SigningMode
+  /** Only present in 'derived' mode — the user's main transparent address. */
+  originAddress?: string
+}
+
+export type LendingSigningMode = 'derived' | 'legacy' | 'legacy_index0'
+
+export interface LendingMcaStatus {
+  mcaId: string | null
+  publicKey: string | null
+  signingMode: LendingSigningMode
 }
 
 export type Network = 'mainnet' | 'testnet'

@@ -9,5 +9,7 @@ export type {
   SendTransactionParams,
   TransactionReceipt,
   SignMessageResult,
+  LendingMcaStatus,
+  LendingSigningMode,
   Network
 } from './types'
