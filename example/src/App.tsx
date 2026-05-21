@@ -4,7 +4,8 @@ import {
   publicKeyToAddress,
   type ZcashAddress,
   type Balance,
-  type SignMessageResult
+  type SignMessageResult,
+  type LendingMcaStatus
 } from '@noir-wallet/sdk'
 import './App.css'
 
@@ -22,7 +23,7 @@ function App() {
   const [txResult, setTxResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const [signForm, setSignForm] = useState({ message: '' })
-  const [signMode, setSignMode] = useState<'current' | 'derived'>('current')
+  const [signMode, setSignMode] = useState<'current' | 'derived' | 'legacy_index0'>('current')
   const [signing, setSigning] = useState(false)
   const [signResult, setSignResult] = useState<{
     success: boolean
@@ -37,7 +38,7 @@ function App() {
     originAddress?: string
   } | null>(null)
   const [loadingPublicKey, setLoadingPublicKey] = useState(false)
-  const [pubKeyMode, setPubKeyMode] = useState<'current' | 'derived'>('current')
+  const [pubKeyMode, setPubKeyMode] = useState<'current' | 'derived' | 'legacy_index0'>('current')
 
   const [convertForm, setConvertForm] = useState({ pubkey: '' })
   const [convertResult, setConvertResult] = useState<{
@@ -47,6 +48,10 @@ function App() {
   } | null>(null)
 
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
+
+  const [mcaStatus, setMcaStatus] = useState<LendingMcaStatus | null>(null)
+  const [loadingMca, setLoadingMca] = useState(false)
+  const [mcaError, setMcaError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!noirWallet) return
@@ -204,6 +209,21 @@ function App() {
       setPublicKeyInfo(null)
     } finally {
       setLoadingPublicKey(false)
+    }
+  }
+
+  const handleCheckMca = async () => {
+    if (!noirWallet) return
+    setLoadingMca(true)
+    setMcaError(null)
+    try {
+      const result = await noirWallet.zcash.checkLendingMcaAccount()
+      setMcaStatus(result)
+    } catch (err: any) {
+      setMcaError(err.message || 'Failed to check MCA')
+      setMcaStatus(null)
+    } finally {
+      setLoadingMca(false)
     }
   }
 
@@ -414,7 +434,7 @@ function App() {
               <p className="card-hint">Get the public key of your transparent address</p>
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label className="label">Signing Mode</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     className={`btn btn-sm ${pubKeyMode === 'current' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setPubKeyMode('current')}
@@ -426,6 +446,12 @@ function App() {
                     onClick={() => setPubKeyMode('derived')}
                   >
                     Derived (Privacy)
+                  </button>
+                  <button
+                    className={`btn btn-sm ${pubKeyMode === 'legacy_index0' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPubKeyMode('legacy_index0')}
+                  >
+                    Legacy Index0
                   </button>
                 </div>
               </div>
@@ -518,6 +544,43 @@ function App() {
             </div>
 
             <div className="card sign-card">
+              <h2>🏦 Lending MCA Status</h2>
+              <p className="card-hint">Check lending MCA account status for current wallet</p>
+              <button
+                className="btn btn-primary btn-full"
+                onClick={handleCheckMca}
+                disabled={loadingMca}
+                style={{ marginBottom: '16px' }}
+              >
+                {loadingMca ? (
+                  <>
+                    <span className="spinner"></span>
+                    Checking...
+                  </>
+                ) : (
+                  'Check Lending MCA'
+                )}
+              </button>
+              {mcaError && <div className="message error">{mcaError}</div>}
+              {mcaStatus && (
+                <div className="signature-result">
+                  <div className="result-item">
+                    <label className="label">MCA ID:</label>
+                    <code className="result-code">{mcaStatus.mcaId || 'None'}</code>
+                  </div>
+                  <div className="result-item">
+                    <label className="label">Public Key:</label>
+                    <code className="result-code">{mcaStatus.publicKey || 'None'}</code>
+                  </div>
+                  <div className="result-item">
+                    <label className="label">Signing Mode:</label>
+                    <code className="result-code">{mcaStatus.signingMode}</code>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="card sign-card">
               <h2>🔄 Convert Public Key to Address</h2>
               <p className="card-hint">Convert any public key to transparent address (mainnet)</p>
               <form onSubmit={handleConvertPubkey} className="sign-form">
@@ -579,7 +642,7 @@ function App() {
               <form onSubmit={handleSign} className="sign-form">
                 <div className="form-group">
                   <label className="label">Signing Mode</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className={`btn btn-sm ${signMode === 'current' ? 'btn-primary' : 'btn-secondary'}`}
@@ -593,6 +656,13 @@ function App() {
                       onClick={() => setSignMode('derived')}
                     >
                       Derived (Privacy)
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${signMode === 'legacy_index0' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setSignMode('legacy_index0')}
+                    >
+                      Legacy Index0
                     </button>
                   </div>
                 </div>
