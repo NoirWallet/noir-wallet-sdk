@@ -22,8 +22,9 @@
 
   /* Borders */
   --border-color: rgba(255, 255, 255, 0.1);
-  --border-radius: 12px;
-  --border-radius-lg: 16px;
+  --border-radius: 10px;
+  --border-radius-sm: 6px;
+  --border-radius-lg: 12px;
 
   /* Spacing */
   --spacing-xs: 4px;
@@ -77,9 +78,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: 10px var(--spacing-md);
   border-radius: var(--border-radius);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -128,19 +129,19 @@ body {
   background: var(--bg-card);
   border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
   backdrop-filter: blur(10px);
 }
 
 /* Input Styles */
 .input {
   width: 100%;
-  padding: var(--spacing-md);
+  padding: 10px 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 14px;
   transition: border-color var(--transition-fast);
 }
 
@@ -156,10 +157,10 @@ body {
 /* Label Styles */
 .label {
   display: block;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 4px;
 }
 
 /* Status Badges */
@@ -212,10 +213,10 @@ body {
 
 /* Feedback Messages */
 .message {
-  padding: var(--spacing-md);
+  padding: 10px 12px;
   border-radius: var(--border-radius);
-  font-size: 14px;
-  margin-top: var(--spacing-md);
+  font-size: 13px;
+  margin-top: var(--spacing-sm);
 }
 
 .message.success {

@@ -1,7 +1,9 @@
 import bs58 from 'bs58'
+import { secp256k1 } from '@noble/curves/secp256k1'
+import { sha256 as nobleSha256 } from '@noble/hashes/sha256'
+import { bytesToHex } from '@noble/hashes/utils'
 import * as hashjs from 'hash.js'
-
-export type Network = 'mainnet' | 'testnet'
+import type { Network, VerifyMessageParams, VerifyMessageResult } from './types'
 
 const MAINNET_P2PKH_PREFIX = new Uint8Array([0x1c, 0xb8])
 const TESTNET_P2PKH_PREFIX = new Uint8Array([0x1d, 0x25])
@@ -114,4 +116,122 @@ export function publicKeyToAddress(pubkeyHex: string, network: Network = 'mainne
   const address = bs58.encode(addressBytes)
 
   return address
+}
+
+function encodeCompactSize(size: number): Uint8Array {
+  if (size <= 0xfc) return new Uint8Array([size])
+  if (size <= 0xffff) {
+    const buf = new Uint8Array(3)
+    buf[0] = 0xfd
+    buf[1] = size & 0xff
+    buf[2] = (size >> 8) & 0xff
+    return buf
+  }
+  const buf = new Uint8Array(5)
+  buf[0] = 0xfe
+  new DataView(buf.buffer).setUint32(1, size, true)
+  return buf
+}
+
+function buildZcashMessagePayload(message: string): Uint8Array {
+  const prefix = 'Zcash Signed Message:\n'
+  const prefixBytes = new TextEncoder().encode(prefix)
+  const msgBytes = new TextEncoder().encode(message)
+  return concatUint8Arrays(
+    encodeCompactSize(prefix.length),
+    prefixBytes,
+    encodeCompactSize(message.length),
+    msgBytes
+  )
+}
+
+function doubleSha256(data: Uint8Array): Uint8Array {
+  return nobleSha256(nobleSha256(data))
+}
+
+function normalizePubkeyHex(pubkeyHex: string): string {
+  return pubkeyHex.toLowerCase().replace(/^0x/, '')
+}
+
+export function verifyMessageSignature(params: VerifyMessageParams): VerifyMessageResult {
+  const { message, signature, pubkey, address, network = 'mainnet' } = params
+
+  if (!message || !signature) {
+    return {
+      valid: false,
+      recoveredPubkey: '',
+      recoveredAddress: '',
+      error: 'Message and signature are required'
+    }
+  }
+
+  try {
+    const cleanSig = signature.toLowerCase().replace(/^0x/, '')
+    if (!/^[0-9a-f]+$/.test(cleanSig) || cleanSig.length !== 130) {
+      return {
+        valid: false,
+        recoveredPubkey: '',
+        recoveredAddress: '',
+        error: 'Invalid signature: expected 65-byte hex string (130 characters)'
+      }
+    }
+
+    const sigBytes = hexToUint8Array(cleanSig)
+    const header = sigBytes[0]
+    if (header < 27 || header > 34) {
+      return {
+        valid: false,
+        recoveredPubkey: '',
+        recoveredAddress: '',
+        error: `Invalid signature header byte: expected 27-34, got ${header}`
+      }
+    }
+
+    const compressed = header >= 31
+    const recoveryId = compressed ? header - 31 : header - 27
+    if (recoveryId < 0 || recoveryId > 3) {
+      return {
+        valid: false,
+        recoveredPubkey: '',
+        recoveredAddress: '',
+        error: `Invalid recovery id: ${recoveryId}`
+      }
+    }
+
+    const compactSig = sigBytes.slice(1)
+    const msgHash = doubleSha256(buildZcashMessagePayload(message))
+    const sig = secp256k1.Signature.fromCompact(compactSig).addRecoveryBit(recoveryId)
+    const recoveredPoint = sig.recoverPublicKey(msgHash)
+    const recoveredPubkey = bytesToHex(recoveredPoint.toRawBytes(false))
+    const recoveredAddress = publicKeyToAddress(recoveredPubkey, network)
+
+    let pubkeyMatch: boolean | undefined
+    let addressMatch: boolean | undefined
+
+    if (pubkey) {
+      pubkeyMatch = normalizePubkeyHex(pubkey) === normalizePubkeyHex(recoveredPubkey)
+    }
+
+    if (address) {
+      addressMatch = address === recoveredAddress
+    }
+
+    const hasExpected = pubkey !== undefined || address !== undefined
+    const valid = hasExpected ? (pubkeyMatch ?? true) && (addressMatch ?? true) : true
+
+    return {
+      valid,
+      recoveredPubkey,
+      recoveredAddress,
+      pubkeyMatch,
+      addressMatch
+    }
+  } catch (err) {
+    return {
+      valid: false,
+      recoveredPubkey: '',
+      recoveredAddress: '',
+      error: err instanceof Error ? err.message : 'Verification failed'
+    }
+  }
 }

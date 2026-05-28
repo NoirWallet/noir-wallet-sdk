@@ -12,7 +12,8 @@ export {
   detectProvider,
   getProvider,
   ZcashAPI,
-  publicKeyToAddress
+  publicKeyToAddress,
+  verifyMessageSignature
 } from './chains/zcash'
 
 export type {
@@ -23,7 +24,10 @@ export type {
   SendTransactionParams,
   TransactionReceipt,
   SignMessageResult,
+  SigningMode,
   LendingMcaStatus,
   LendingSigningMode,
-  Network
+  Network,
+  VerifyMessageParams,
+  VerifyMessageResult
 } from './chains/zcash'

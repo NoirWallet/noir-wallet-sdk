@@ -68,3 +68,20 @@ export interface LendingMcaStatus {
 }
 
 export type Network = 'mainnet' | 'testnet'
+
+export interface VerifyMessageParams {
+  message: string
+  signature: string
+  pubkey?: string
+  address?: string
+  network?: Network
+}
+
+export interface VerifyMessageResult {
+  valid: boolean
+  recoveredPubkey: string
+  recoveredAddress: string
+  pubkeyMatch?: boolean
+  addressMatch?: boolean
+  error?: string
+}

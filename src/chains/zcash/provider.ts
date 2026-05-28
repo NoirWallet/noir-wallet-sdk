@@ -3,7 +3,8 @@ import type { ZcashProvider } from './types'
 export function getZcashProvider(): ZcashProvider | null {
   if (typeof window === 'undefined') return null
   const noirWallet = (window as any).noirwallet
-  return noirWallet?.zcash || null
+  if (!noirWallet?.isNoirWallet) return null
+  return noirWallet.zcash || null
 }
 
 export async function detectProvider(timeout = 3000): Promise<ZcashProvider> {
