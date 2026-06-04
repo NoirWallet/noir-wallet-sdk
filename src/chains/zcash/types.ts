@@ -69,6 +69,18 @@ export interface LendingMcaStatus {
 
 export type Network = 'mainnet' | 'testnet'
 
+export interface ZcashChainInfo {
+  chainId: string
+  network: string
+}
+
+export type ZcashProviderEventMap = {
+  accountsChanged: (accounts: ZcashAddress | null) => void
+  chainChanged: (chainInfo: ZcashChainInfo) => void
+}
+
+export type ZcashProviderEvent = keyof ZcashProviderEventMap
+
 export interface VerifyMessageParams {
   message: string
   signature: string

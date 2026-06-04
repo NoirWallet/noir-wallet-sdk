@@ -2,7 +2,7 @@ import type { ZcashProvider } from './types'
 
 export function getZcashProvider(): ZcashProvider | null {
   if (typeof window === 'undefined') return null
-  const noirWallet = (window as any).noirwallet
+  const noirWallet = window.noirwallet
   if (!noirWallet?.isNoirWallet) return null
   return noirWallet.zcash || null
 }
@@ -20,9 +20,19 @@ export async function detectProvider(timeout = 3000): Promise<ZcashProvider> {
     }
 
     let handled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const cleanup = () => {
+      window.removeEventListener('noirwallet#initialized', handleProvider)
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
+    }
+
     const handleProvider = () => {
       if (handled) return
       handled = true
+      cleanup()
 
       const provider = getZcashProvider()
       if (provider) {
@@ -32,11 +42,9 @@ export async function detectProvider(timeout = 3000): Promise<ZcashProvider> {
       }
     }
 
-    window.addEventListener('noirwallet#initialized', handleProvider, { once: true })
+    window.addEventListener('noirwallet#initialized', handleProvider)
 
-    setTimeout(() => {
-      handleProvider()
-    }, timeout)
+    timeoutId = setTimeout(handleProvider, timeout)
   })
 }
 

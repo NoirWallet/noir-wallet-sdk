@@ -12,6 +12,7 @@ pnpm install
 
 ```bash
 pnpm build
+pnpm test
 pnpm --filter @noir-wallet/example build
 ```
 
@@ -117,7 +118,7 @@ await zcash.connect()
 // Listen to account changes (unlock/lock, switch account)
 zcash.on('accountsChanged', accounts => {
   console.log('Accounts changed:', accounts)
-  if (accounts.length === 0) {
+  if (!accounts) {
     console.log('Wallet locked or disconnected')
   }
 })
@@ -186,7 +187,7 @@ Get the public key of the transparent address.
 
 **Params** (optional):
 
-- `options.signingMode`: `'current'` (default) or `'derived'`
+- `options.signingMode`: `'current'` (default), `'derived'`, or `'legacy_index0'`
 
 **Returns**: `Promise<{ pubkey: string, address: string, signingMode: SigningMode, originAddress?: string } | null>`
 
@@ -203,6 +204,9 @@ const publicKeyInfo = await zcash.getPublicKey()
 const derivedKey = await zcash.getPublicKey({ signingMode: 'derived' })
 console.log('Derived Key:', derivedKey.pubkey)
 console.log('Main Address:', derivedKey.originAddress)
+
+// Legacy index 0: BIP-44 index 0 key (legacy MCA accounts)
+const legacyKey = await zcash.getPublicKey({ signingMode: 'legacy_index0' })
 ```
 
 **Note**: This method requires the wallet to be connected but does not trigger an unlock popup. Returns `null` if the wallet is locked.
@@ -234,7 +238,7 @@ Sign a message with a transparent address key.
 **Params**:
 
 - `message: string` - Message to sign
-- `options.signingMode`: `'current'` (default) or `'derived'`
+- `options.signingMode`: `'current'` (default), `'derived'`, or `'legacy_index0'`
 
 **Returns**: `Promise<SignMessageResult>`
 
@@ -253,6 +257,9 @@ const result = await zcash.signMessage('Hello World')
 const derived = await zcash.signMessage('Hello World', { signingMode: 'derived' })
 console.log('Signature:', derived.signature)
 console.log('Origin Address:', derived.originAddress)
+
+// Legacy index 0: for legacy MCA account binding
+const legacy = await zcash.signMessage('Hello World', { signingMode: 'legacy_index0' })
 ```
 
 #### `switchNetwork(network)`
@@ -265,6 +272,30 @@ Switch between mainnet and testnet.
 
 ```typescript
 await zcash.switchNetwork('testnet')
+```
+
+#### `disconnect()`
+
+Disconnect the dApp session. Clears the authorized connection without locking the wallet.
+
+**Returns**: `Promise<void>`
+
+```typescript
+await zcash.disconnect()
+```
+
+#### `checkLendingMcaAccount()`
+
+Check whether the connected account has a Noir lending MCA (Multi-Chain Account) binding.
+
+**Returns**: `Promise<LendingMcaStatus | null>`
+
+```typescript
+const status = await zcash.checkLendingMcaAccount()
+if (status?.mcaId) {
+  console.log('MCA ID:', status.mcaId)
+  console.log('Signing mode:', status.signingMode)
+}
 ```
 
 ### Utility Functions
@@ -304,13 +335,45 @@ const externalAddress = publicKeyToAddress(externalPubkey, 'mainnet')
 
 **Note**: This function implements the Bitcoin/Zcash P2PKH address generation algorithm (SHA256 → RIPEMD160 → Base58Check).
 
+#### `verifyMessageSignature(params)`
+
+Verify a Zcash signed message offline (no wallet required). Recovers the signer public key and transparent address from the message and signature, and optionally checks them against expected values.
+
+**Params**:
+
+- `message: string` - The signed message
+- `signature: string` - 65-byte hex signature (130 characters, with recovery header byte)
+- `pubkey?: string` - Expected public key (optional)
+- `address?: string` - Expected transparent address (optional)
+- `network?: 'mainnet' | 'testnet'` - Network for address derivation (defaults to `'mainnet'`)
+
+**Returns**: `VerifyMessageResult`
+
+```typescript
+import { verifyMessageSignature } from '@noir-wallet/sdk'
+
+const result = verifyMessageSignature({
+  message: 'Hello World',
+  signature: signed.signature,
+  pubkey: signed.pubkey,
+  address: signed.address,
+  network: 'mainnet'
+})
+
+if (result.valid) {
+  console.log('Signer address:', result.recoveredAddress)
+} else {
+  console.error('Verification failed:', result.error)
+}
+```
+
 ### Events
 
 #### `accountsChanged`
 
 Triggered when accounts change (unlock/lock, switch account).
 
-**Data**: `ZcashAddress | null` - Current addresses (null if locked/disconnected)
+**Data**: `ZcashAddress | null` - Current address pair (null if locked/disconnected)
 
 #### `chainChanged`
 
@@ -338,7 +401,7 @@ interface SendTransactionParams {
   amount: string
 }
 
-type SigningMode = 'derived' | 'current'
+type SigningMode = 'derived' | 'current' | 'legacy_index0'
 
 interface SignMessageOptions {
   signingMode?: SigningMode // Default: 'current'
@@ -350,6 +413,21 @@ interface SignMessageResult {
   address: string // Transparent address used for signing
   signingMode: SigningMode // Actual signing mode used
   originAddress?: string // Main transparent address (only in 'derived' mode)
+}
+
+interface LendingMcaStatus {
+  mcaId: string | null
+  publicKey: string | null
+  signingMode: 'derived' | 'legacy' | 'legacy_index0'
+}
+
+interface VerifyMessageResult {
+  valid: boolean
+  recoveredPubkey: string
+  recoveredAddress: string
+  pubkeyMatch?: boolean
+  addressMatch?: boolean
+  error?: string
 }
 
 type Network = 'mainnet' | 'testnet'

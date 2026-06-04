@@ -7,6 +7,7 @@ This repository is the public SDK and example mirror for Noir Wallet.
 ```bash
 pnpm install
 pnpm build
+pnpm test
 pnpm --filter @noir-wallet/example build
 ```
 

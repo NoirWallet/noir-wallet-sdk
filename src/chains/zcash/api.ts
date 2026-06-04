@@ -7,7 +7,9 @@ import type {
   SignMessageResult,
   SigningMode,
   LendingMcaStatus,
-  Network
+  Network,
+  ZcashProviderEvent,
+  ZcashProviderEventMap
 } from './types'
 
 export class ZcashAPI {
@@ -72,11 +74,18 @@ export class ZcashAPI {
     await this.provider.request({ method: 'zcash_disconnect' })
   }
 
-  on(event: string, handler: (...args: any[]) => void): void {
-    this.provider.on(event, handler)
+  on<E extends ZcashProviderEvent>(event: E, handler: ZcashProviderEventMap[E]): void {
+    this.provider.on(event, handler as (...args: unknown[]) => void)
   }
 
-  removeListener(event: string, handler: (...args: any[]) => void): void {
-    this.provider.removeListener?.(event, handler)
+  removeListener<E extends ZcashProviderEvent>(
+    event: E,
+    handler: ZcashProviderEventMap[E]
+  ): void {
+    this.provider.removeListener?.(event, handler as (...args: unknown[]) => void)
+  }
+
+  off<E extends ZcashProviderEvent>(event: E, handler: ZcashProviderEventMap[E]): void {
+    this.removeListener(event, handler)
   }
 }

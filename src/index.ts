@@ -23,11 +23,15 @@ export type {
   Balance,
   SendTransactionParams,
   TransactionReceipt,
+  SignMessageOptions,
   SignMessageResult,
   SigningMode,
   LendingMcaStatus,
   LendingSigningMode,
   Network,
+  ZcashChainInfo,
+  ZcashProviderEvent,
+  ZcashProviderEventMap,
   VerifyMessageParams,
   VerifyMessageResult
 } from './chains/zcash'
