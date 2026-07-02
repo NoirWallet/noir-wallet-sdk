@@ -19,7 +19,53 @@ export interface Balance {
   transparent: string
   shielded: string
   total?: string
+  spendable?: string
   available?: string
+}
+
+/**
+ * A single account authorized through a batch (multi-wallet) connection.
+ * `id` is the stable `${walletId}:${accountId}` key returned by the batch APIs;
+ * `label` is the human-readable wallet name shown in the wallet UI.
+ */
+export interface ZcashAccount {
+  id: string
+  label: string
+  walletId: string
+  accountId: string
+  addresses: ZcashAddress
+}
+
+/**
+ * Balance for one authorized account. `synced` is `false` when the value is a
+ * cached/zero fallback (e.g. the wallet is locked or that account has not been
+ * synced yet), so dApps can choose whether to trust it.
+ */
+export interface ZcashAccountBalance {
+  id: string
+  walletId: string
+  accountId: string
+  balance: Balance
+  synced: boolean
+}
+
+/**
+ * Result of `connect()` / `getAccounts()`. Backward compatible: the top-level
+ * `transparent`/`shielded` are the primary connected account (what
+ * single-account methods operate on), while `accounts` lists every wallet the
+ * user authorized for read access (always contains at least the primary).
+ */
+export interface ZcashConnectResult extends ZcashAddress {
+  accounts: ZcashAccount[]
+}
+
+/**
+ * Result of `getBalance()`. Backward compatible: top-level fields are the
+ * primary (or requested) account's balance; `accounts` carries the balance of
+ * every authorized account, each flagged with `synced`.
+ */
+export interface ZcashBalanceResult extends Balance {
+  accounts: ZcashAccountBalance[]
 }
 
 export interface SendTransactionParams {
