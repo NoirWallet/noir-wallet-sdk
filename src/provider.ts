@@ -4,6 +4,7 @@ import type { ZcashProvider } from './chains/zcash/types'
 
 interface RawNoirWallet {
   isNoirWallet: boolean
+  version?: string
   zcash: ZcashProvider
 }
 
@@ -15,6 +16,7 @@ export function getNoirWallet(): NoirWalletProvider | null {
 
   return {
     isNoirWallet: rawWallet.isNoirWallet,
+    version: rawWallet.version,
     zcash: new ZcashAPI(rawWallet.zcash)
   }
 }

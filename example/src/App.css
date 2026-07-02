@@ -405,6 +405,35 @@
   animation: fadeIn 0.25s ease;
 }
 
+/* Batch (multi-wallet) panel */
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.batch-item {
+  padding: var(--spacing-sm);
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.batch-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.batch-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 /* Responsive */
 @media (max-width: 720px) {
   .header-content {

@@ -4,6 +4,8 @@ import {
   publicKeyToAddress,
   verifyMessageSignature,
   type ZcashAddress,
+  type ZcashAccount,
+  type ZcashAccountBalance,
   type Balance,
   type SignMessageResult,
   type LendingMcaStatus,
@@ -11,7 +13,7 @@ import {
 } from '@noir-wallet/sdk'
 import './App.css'
 
-type TabId = 'overview' | 'send' | 'signing' | 'tools'
+type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch'
 
 const SIGNING_MODES: { id: SigningMode; label: string }[] = [
   { id: 'current', label: 'Current' },
@@ -141,6 +143,11 @@ function App() {
   const [loadingMca, setLoadingMca] = useState(false)
   const [mcaError, setMcaError] = useState<string | null>(null)
 
+  const [batchAccounts, setBatchAccounts] = useState<ZcashAccount[]>([])
+  const [batchBalances, setBatchBalances] = useState<ZcashAccountBalance[]>([])
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!noirWallet) return
 
@@ -151,17 +158,24 @@ function App() {
         setConnected(false)
         setAddresses(null)
         setBalance(null)
+        setBatchAccounts([])
+        setBatchBalances([])
       } else {
         setConnected(true)
         setAddresses(accounts)
-        const balance = await zcash.getBalance()
-        setBalance(balance)
+        // 方案 D: re-query the authorized account list + balances on change
+        const result = await zcash.getAccounts()
+        setBatchAccounts(result?.accounts ?? [])
+        const bal = await zcash.getBalance()
+        setBalance(bal)
+        setBatchBalances(bal.accounts)
       }
     })
 
     zcash.on('chainChanged', async () => {
-      const balance = await zcash.getBalance()
-      setBalance(balance)
+      const bal = await zcash.getBalance()
+      setBalance(bal)
+      setBatchBalances(bal.accounts)
     })
 
     autoConnect()
@@ -171,13 +185,15 @@ function App() {
     try {
       const zcash = noirWallet?.zcash
       if (!zcash) return
-      const accounts = await zcash.getAccounts()
-      if (accounts) {
+      const result = await zcash.getAccounts()
+      if (result) {
         setConnected(true)
-        setAddresses(accounts)
+        setAddresses(result)
+        setBatchAccounts(result.accounts)
         try {
-          const balance = await zcash.getBalance()
-          setBalance(balance || { transparent: '0', shielded: '0' })
+          const bal = await zcash.getBalance()
+          setBalance(bal || { transparent: '0', shielded: '0' })
+          setBatchBalances(bal.accounts)
         } catch (balanceError) {
           console.warn('Balance fetch failed during autoConnect:', balanceError)
           setBalance({ transparent: '0', shielded: '0' })
@@ -200,11 +216,13 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const accounts = await noirWallet.zcash.connect()
+      const result = await noirWallet.zcash.connect()
       setConnected(true)
-      setAddresses(accounts)
-      const balance = await noirWallet.zcash.getBalance()
-      setBalance(balance)
+      setAddresses(result)
+      setBatchAccounts(result.accounts)
+      const bal = await noirWallet.zcash.getBalance()
+      setBalance(bal)
+      setBatchBalances(bal.accounts)
     } catch (err: any) {
       setError(err.message || 'Connection failed')
     } finally {
@@ -223,6 +241,8 @@ function App() {
     setConnected(false)
     setAddresses(null)
     setBalance(null)
+    setBatchAccounts([])
+    setBatchBalances([])
   }
 
   const refreshBalance = async () => {
@@ -230,6 +250,7 @@ function App() {
     try {
       const bal = await noirWallet.zcash.getBalance()
       setBalance(bal)
+      setBatchBalances(bal.accounts)
     } catch (err: any) {
       console.error('Refresh balance failed:', err)
     }
@@ -372,6 +393,38 @@ function App() {
     }
   }
 
+  // 方案 D: a single connect() drives the multi-select approval; the authorized
+  // wallets come back on result.accounts (no dedicated batch method).
+  const authorizeMultiple = async () => {
+    if (!noirWallet) return
+    setBatchLoading(true)
+    setBatchError(null)
+    try {
+      const result = await noirWallet.zcash.connect()
+      setConnected(true)
+      setAddresses(result)
+      setBatchAccounts(result.accounts)
+      const bal = await noirWallet.zcash.getBalance()
+      setBalance(bal)
+      setBatchBalances(bal.accounts)
+    } catch (err: any) {
+      setBatchError(err.message || 'Authorization failed')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  const refreshBatchBalances = async () => {
+    if (!noirWallet || batchAccounts.length === 0) return
+    setBatchError(null)
+    try {
+      const bal = await noirWallet.zcash.getBalance()
+      setBatchBalances(bal.accounts)
+    } catch (err: any) {
+      setBatchError(err.message || 'Failed to load balances')
+    }
+  }
+
   const handleConvertPubkey = (e: React.FormEvent) => {
     e.preventDefault()
     if (!convertForm.pubkey) return
@@ -387,7 +440,8 @@ function App() {
     { id: 'overview', label: 'Overview' },
     { id: 'send', label: 'Send' },
     { id: 'signing', label: 'Sign & Verify' },
-    { id: 'tools', label: 'Tools' }
+    { id: 'tools', label: 'Tools' },
+    { id: 'batch', label: 'Batch' }
   ]
 
   return (
@@ -906,6 +960,96 @@ function App() {
                         <label className="label">Signing Mode</label>
                         <code className="result-code">{mcaStatus.signingMode}</code>
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'batch' && (
+              <div className="tab-panel">
+                <div className="card card-compact">
+                  <div className="card-header">
+                    <h2>👛 Multi-Wallet Access</h2>
+                    <div className="btn-row">
+                      <button
+                        className="btn btn-primary btn-xs"
+                        onClick={authorizeMultiple}
+                        disabled={batchLoading}
+                      >
+                        {batchLoading
+                          ? 'Connecting...'
+                          : batchAccounts.length
+                            ? 'Re-authorize'
+                            : 'Connect Multiple'}
+                      </button>
+                      {batchAccounts.length > 0 && (
+                        <button className="btn btn-secondary btn-xs" onClick={refreshBatchBalances}>
+                          Refresh Balances
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="card-hint">
+                    Authorize several independent wallets in one approval. The dApp can then read
+                    each wallet's transparent &amp; shielded addresses and balances.
+                  </p>
+                  {batchError && <div className="message error">{batchError}</div>}
+                  {batchAccounts.length === 0 && !batchError && (
+                    <div className="message">
+                      No wallets authorized yet. Click "Connect Multiple" and pick wallets in the
+                      popup.
+                    </div>
+                  )}
+                  {batchAccounts.length > 0 && (
+                    <div className="batch-list">
+                      {batchAccounts.map(acc => {
+                        const bal = batchBalances.find(b => b.id === acc.id)
+                        return (
+                          <div key={acc.id} className="batch-item">
+                            <div className="batch-item-header">
+                              <span className="batch-label">{acc.label}</span>
+                              {bal && (
+                                <span
+                                  className={`status-badge ${bal.synced ? 'connected' : 'disconnected'}`}
+                                >
+                                  {bal.synced ? 'synced' : 'cached'}
+                                </span>
+                              )}
+                            </div>
+                            <ResultField
+                              label="Shielded Address"
+                              value={acc.addresses.shielded}
+                              copyId={`batch-zs-${acc.id}`}
+                              copied={copiedAddress}
+                              onCopy={copyToClipboard}
+                            />
+                            <ResultField
+                              label="Transparent Address"
+                              value={acc.addresses.transparent}
+                              copyId={`batch-t-${acc.id}`}
+                              copied={copiedAddress}
+                              onCopy={copyToClipboard}
+                            />
+                            {bal && (
+                              <div className="balance-grid balance-grid-compact">
+                                <div className="balance-item">
+                                  <span className="balance-label">Shielded</span>
+                                  <span className="balance-value highlight">
+                                    {formatBalance(bal.balance.shielded)}
+                                  </span>
+                                </div>
+                                <div className="balance-item">
+                                  <span className="balance-label">Transparent</span>
+                                  <span className="balance-value">
+                                    {formatBalance(bal.balance.transparent)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

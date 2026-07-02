@@ -115,11 +115,15 @@ const zcash = noirWallet.zcash
 await zcash.connect()
 
 // Listen to account changes (unlock/lock, switch account)
-zcash.on('accountsChanged', accounts => {
-  console.log('Accounts changed:', accounts)
-  if (accounts.length === 0) {
+zcash.on('accountsChanged', async addresses => {
+  if (!addresses) {
     console.log('Wallet locked or disconnected')
+    return
   }
+  console.log('Primary account changed:', addresses.transparent)
+  // Multi-wallet dApps: refresh the authorized account list
+  const result = await zcash.getAccounts()
+  console.log('Authorized wallets:', result?.accounts.length)
 })
 
 // Listen to chain/network changes
@@ -136,41 +140,62 @@ All methods are available on `noirWallet.zcash`:
 
 #### `connect()`
 
-Request wallet connection (shows popup if not authorized).
+Request wallet connection (shows popup if not authorized). The approval screen lets the user authorize **one or several independent wallets** in a single action (MetaMask-style: the current account is preselected, more can be added).
 
-**Returns**: `Promise<ZcashAddress>` - Address object with transparent and shielded addresses
+**Returns**: `Promise<ZcashConnectResult>` — the primary account's `transparent`/`shielded` addresses **plus** an `accounts` array listing every authorized wallet.
 
 ```typescript
-const accounts = await zcash.connect()
-console.log('Transparent:', accounts.transparent)
-console.log('Shielded:', accounts.shielded)
+const result = await zcash.connect()
+
+// Primary (connected) account — same shape as before, fully backward compatible
+console.log('Transparent:', result.transparent)
+console.log('Shielded:', result.shielded)
+
+// Every authorized wallet (always contains at least the primary)
+result.accounts.forEach(acc => {
+  console.log(acc.label, acc.addresses.transparent, acc.addresses.shielded)
+})
 ```
 
 #### `getAccounts()`
 
 Query existing connection silently (no popup).
 
-**Returns**: `Promise<ZcashAddress | null>` - Address object if connected, null if not connected
+**Returns**: `Promise<ZcashConnectResult | null>` — same enhanced shape as `connect()`, or `null` if not connected.
 
 ```typescript
-const accounts = await zcash.getAccounts()
-if (accounts) {
-  console.log('Connected:', accounts.transparent)
+const result = await zcash.getAccounts()
+if (result) {
+  console.log('Connected:', result.transparent)
+  console.log('Authorized wallets:', result.accounts.length)
 } else {
   console.log('Not connected')
 }
 ```
 
-#### `getBalance()`
+#### `getBalance(accountId?)`
 
 Get wallet balance.
 
-**Returns**: `Promise<Balance>`
+**Params** (optional):
+
+- `accountId: string` — an account `id` (the `${walletId}:${accountId}` key from `accounts`). Omit to read the primary (connected) account.
+
+**Returns**: `Promise<ZcashBalanceResult>` — the primary (or requested) account's balance fields **plus** an `accounts` array with every authorized account's balance.
 
 ```typescript
+// Primary account balance (backward compatible)
 const balance = await zcash.getBalance()
 console.log('Shielded:', balance.shielded, 'ZEC')
 console.log('Available:', balance.available, 'ZEC') // Recommended for max send amount
+
+// Per-wallet balances
+balance.accounts.forEach(b => {
+  console.log(b.id, b.balance.shielded, b.synced ? '(synced)' : '(cached)')
+})
+
+// A specific authorized wallet
+const second = await zcash.getBalance(balance.accounts[1]?.id)
 ```
 
 **Balance fields**:
@@ -179,6 +204,9 @@ console.log('Available:', balance.available, 'ZEC') // Recommended for max send 
 - `shielded`: Shielded balance (Sapling + Orchard)
 - `total`: Total balance (transparent + shielded)
 - `available`: **Precise transferable amount** - Maximum amount that can be sent considering UTXO selection, dynamic fees, and dust threshold. Calculated during background sync using WASM's `get_max_transferable_amount` method.
+- `accounts`: Balance of every authorized account; each entry carries a `synced` flag (`false` = cached/zero fallback because the wallet is locked or that account hasn't synced yet).
+
+> **Multi-wallet access & compatibility:** `connect()` / `getAccounts()` / `getBalance()` are backward compatible — their original top-level fields are unchanged, and the `accounts` array is purely additive. dApps on **older extensions** that don't return `accounts` still work: the SDK normalizes the single-account response into a one-element `accounts` array, so your code path is identical regardless of extension version. To react to changes, listen for `accountsChanged` and re-call `getAccounts()` / `getBalance()` to refresh the array.
 
 #### `getPublicKey(options?)`
 
@@ -318,6 +346,8 @@ Triggered when network changes.
 
 **Data**: `{ chainId: string, network: string }`
 
+> **Multi-wallet dApps:** there is no separate batch event. When `accountsChanged` fires, re-call `getAccounts()` (and `getBalance()`) to refresh the `accounts` array.
+
 ## Types
 
 ```typescript
@@ -331,6 +361,36 @@ interface Balance {
   shielded: string
   total?: string
   available?: string // Precise max transferable amount
+}
+
+// One account from a batch (multi-wallet) authorization.
+// `id` is the stable `${walletId}:${accountId}` key; `label` is the wallet name.
+interface ZcashAccount {
+  id: string
+  label: string
+  walletId: string
+  accountId: string
+  addresses: ZcashAddress
+}
+
+// Balance for one authorized account.
+// `synced: false` means a cached/zero fallback (locked or not yet synced).
+interface ZcashAccountBalance {
+  id: string
+  walletId: string
+  accountId: string
+  balance: Balance
+  synced: boolean
+}
+
+// Result of connect() / getAccounts(): primary account fields + every authorized wallet.
+interface ZcashConnectResult extends ZcashAddress {
+  accounts: ZcashAccount[]
+}
+
+// Result of getBalance(): primary (or requested) balance + every authorized balance.
+interface ZcashBalanceResult extends Balance {
+  accounts: ZcashAccountBalance[]
 }
 
 interface SendTransactionParams {
