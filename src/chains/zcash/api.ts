@@ -88,6 +88,11 @@ export class ZcashAPI {
     return this.normalizeBalance(res)
   }
 
+  /** Get the connected wallet's transparent and shielded addresses. */
+  async getAddresses(): Promise<ZcashAddress> {
+    return this.provider.request({ method: 'zcash_getAddresses' })
+  }
+
   async getPublicKey(options?: SignMessageOptions): Promise<{
     pubkey: string
     address: string

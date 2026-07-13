@@ -47,6 +47,14 @@
   },
   "author": "Noir Finance",
   "license": "MIT",
+  "homepage": "https://noirwallet.github.io/noir-wallet-sdk/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NoirWallet/noir-wallet-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NoirWallet/noir-wallet-sdk/issues"
+  },
   "dependencies": {
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",

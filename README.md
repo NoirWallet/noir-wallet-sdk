@@ -1,5 +1,8 @@
 # Noir Wallet SDK
 
+> **For regular use**, install Noir Wallet from the [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn).
+> Preview builds for testing are available on the [Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) page.
+
 TypeScript SDK and example dApp for integrating with Noir Wallet.
 
 ## Install
@@ -283,17 +286,9 @@ console.log('Signature:', derived.signature)
 console.log('Origin Address:', derived.originAddress)
 ```
 
-#### `switchNetwork(network)`
+#### `switchNetwork(network)` *(deprecated)*
 
-Switch between mainnet and testnet.
-
-**Params**: `network: 'mainnet' | 'testnet'`
-
-**Returns**: `Promise<boolean>`
-
-```typescript
-await zcash.switchNetwork('testnet')
-```
+> **Deprecated**: Mainnet and testnet are now separate extension builds. Install the testnet extension for testnet usage. This method is retained for backward compatibility but has no effect.
 
 ### Utility Functions
 

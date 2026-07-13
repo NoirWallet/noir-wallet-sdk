@@ -447,7 +447,7 @@ function App() {
         <div className="header-content">
           <div className="logo">
             <a href="/" className="logo-link">
-              <img src="/example/logo.png" alt="Noir Wallet" className="logo-img" />
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Noir Wallet" className="logo-img" />
               <span className="logo-text">
                 <span className="logo-noir">Noir </span>
                 <span className="logo-wallet">Wallet</span>
