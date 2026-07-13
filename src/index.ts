@@ -10,7 +10,6 @@ export type {
 export {
   getZcashProvider,
   detectProvider,
-  getProvider,
   ZcashAPI,
   publicKeyToAddress,
   verifyMessageSignature
@@ -27,6 +26,7 @@ export type {
   Balance,
   SendTransactionParams,
   TransactionReceipt,
+  SignMessageOptions,
   SignMessageResult,
   SigningMode,
   LendingMcaStatus,

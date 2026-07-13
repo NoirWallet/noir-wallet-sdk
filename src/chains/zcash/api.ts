@@ -116,11 +116,11 @@ export class ZcashAPI {
     })
   }
 
-  async switchNetwork(network: Network): Promise<boolean> {
-    return this.provider.request({
-      method: 'zcash_switchNetwork',
-      params: [{ network }]
-    })
+  /** @deprecated Network is determined at build time. Install the testnet extension instead. */
+  async switchNetwork(_network: Network): Promise<never> {
+    throw new Error(
+      'switchNetwork() is deprecated. Install the [Testnet] Noir Wallet extension instead.'
+    )
   }
 
   async checkLendingMcaAccount(): Promise<LendingMcaStatus | null> {

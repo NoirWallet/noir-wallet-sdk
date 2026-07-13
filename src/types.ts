@@ -20,10 +20,3 @@ export interface ProviderRpcError extends Error {
   code: number
   data?: unknown
 }
-
-export type {
-  RequestArguments,
-  SigningMode,
-  SignMessageOptions,
-  SignMessageResult
-} from './chains/zcash/types'

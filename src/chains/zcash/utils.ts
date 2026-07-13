@@ -1,20 +1,12 @@
 import bs58 from 'bs58'
 import { secp256k1 } from '@noble/curves/secp256k1'
-import { sha256 as nobleSha256 } from '@noble/hashes/sha256'
+import { sha256 } from '@noble/hashes/sha256'
+import { ripemd160 } from '@noble/hashes/ripemd160'
 import { bytesToHex } from '@noble/hashes/utils'
-import * as hashjs from 'hash.js'
 import type { Network, VerifyMessageParams, VerifyMessageResult } from './types'
 
 const MAINNET_P2PKH_PREFIX = new Uint8Array([0x1c, 0xb8])
 const TESTNET_P2PKH_PREFIX = new Uint8Array([0x1d, 0x25])
-
-function sha256(data: Uint8Array): Uint8Array {
-  return new Uint8Array(hashjs.sha256().update(Array.from(data)).digest())
-}
-
-function ripemd160(data: Uint8Array): Uint8Array {
-  return new Uint8Array(hashjs.ripemd160().update(Array.from(data)).digest())
-}
 
 function hash160(data: Uint8Array): Uint8Array {
   return ripemd160(sha256(data))
@@ -146,7 +138,7 @@ function buildZcashMessagePayload(message: string): Uint8Array {
 }
 
 function doubleSha256(data: Uint8Array): Uint8Array {
-  return nobleSha256(nobleSha256(data))
+  return sha256(sha256(data))
 }
 
 function normalizePubkeyHex(pubkeyHex: string): string {

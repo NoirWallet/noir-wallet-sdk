@@ -26,7 +26,8 @@
     "type-check": "tsc --noEmit",
     "pack:dry": "npm pack --dry-run",
     "example:dev": "pnpm --filter @noir-wallet/example dev",
-    "example:build": "pnpm --filter @noir-wallet/example build"
+    "example:build": "pnpm --filter @noir-wallet/example build",
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
@@ -49,8 +50,7 @@
   "dependencies": {
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
-    "bs58": "^6.0.0",
-    "hash.js": "^1.1.7"
+    "bs58": "^6.0.0"
   },
   "private": false,
   "packageManager": "pnpm@10.33.4",

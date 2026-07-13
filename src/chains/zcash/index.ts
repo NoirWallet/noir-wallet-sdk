@@ -1,4 +1,4 @@
-export { getZcashProvider, detectProvider, getProvider } from './provider'
+export { getZcashProvider, detectProvider } from './provider'
 export { ZcashAPI } from './api'
 export { publicKeyToAddress, verifyMessageSignature } from './utils'
 export type {
@@ -12,6 +12,7 @@ export type {
   Balance,
   SendTransactionParams,
   TransactionReceipt,
+  SignMessageOptions,
   SignMessageResult,
   SigningMode,
   LendingMcaStatus,

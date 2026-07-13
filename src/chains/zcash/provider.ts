@@ -40,6 +40,3 @@ export async function detectProvider(timeout = 3000): Promise<ZcashProvider> {
   })
 }
 
-export function getProvider(): ZcashProvider | null {
-  return getZcashProvider()
-}
