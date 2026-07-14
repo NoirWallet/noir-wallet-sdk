@@ -229,7 +229,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
-  const [sendForm, setSendForm] = useState({ to: '', amount: '' })
+  const [sendForm, setSendForm] = useState({ to: '', amount: '', memo: '' })
   const [sending, setSending] = useState(false)
   const [txResult, setTxResult] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -430,10 +430,11 @@ function App() {
     try {
       const txid = await noirWallet.zcash.sendTransaction({
         to: sendForm.to,
-        amount: sendForm.amount
+        amount: sendForm.amount,
+        memo: sendForm.memo || undefined
       })
       setTxResult({ success: true, message: `Transaction Successful! TXID: ${txid}` })
-      setSendForm({ to: '', amount: '' })
+      setSendForm({ to: '', amount: '', memo: '' })
       await refreshBalance()
     } catch (err: any) {
       setTxResult({ success: false, message: err.message || 'Transaction Failed' })
@@ -834,6 +835,20 @@ function App() {
                         value={sendForm.amount}
                         onChange={e => setSendForm({ ...sendForm, amount: e.target.value })}
                         required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="label">Memo (optional, max 512 bytes)</label>
+                      <textarea
+                        className="input input-sm"
+                        placeholder="Add a private memo"
+                        rows={2}
+                        value={sendForm.memo}
+                        onChange={e => {
+                          const encoded = new TextEncoder().encode(e.target.value)
+                          if (encoded.length <= 512) setSendForm({ ...sendForm, memo: e.target.value })
+                        }}
+                        style={{ resize: 'none' }}
                       />
                     </div>
                     <button
