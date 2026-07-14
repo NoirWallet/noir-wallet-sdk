@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
   getNoirWallet,
   publicKeyToAddress,
@@ -213,8 +213,15 @@ function TxRow({
 }
 
 function App() {
-  const noirWallet = useMemo(() => getNoirWallet(), [])
+  const [noirWallet, setNoirWallet] = useState(() => getNoirWallet())
   const isInstalled = !!noirWallet
+
+  useEffect(() => {
+    if (noirWallet) return
+    const onReady = () => setNoirWallet(getNoirWallet())
+    window.addEventListener('noirwallet#initialized', onReady)
+    return () => window.removeEventListener('noirwallet#initialized', onReady)
+  }, [noirWallet])
   const [connected, setConnected] = useState(false)
   const [addresses, setAddresses] = useState<ZcashAddress | null>(null)
   const [balance, setBalance] = useState<Balance | null>(null)
