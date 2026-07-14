@@ -71,6 +71,8 @@ export interface ZcashBalanceResult extends Balance {
 export interface SendTransactionParams {
   to: string
   amount: string
+  /** Private memo attached to shielded transactions (max 512 bytes UTF-8). */
+  memo?: string
 }
 
 export interface TransactionReceipt {

@@ -81,10 +81,11 @@ if (publicKeyInfo) {
   console.log('Address:', publicKeyInfo.address)
 }
 
-// Send transaction (uses shielded balance only)
+// Send transaction with optional memo
 const txid = await zcash.sendTransaction({
   to: 'zs1XYZ...',
-  amount: '0.1'
+  amount: '0.1',
+  memo: 'Payment for services'
 })
 console.log('Transaction sent:', txid)
 
@@ -240,12 +241,13 @@ console.log('Main Address:', derivedKey.originAddress)
 
 #### `sendTransaction(params)`
 
-Send a transaction. **Only shielded balance is used for sending.** Transparent balance cannot be spent directly — it must be shielded in the wallet first. Memo is not yet supported.
+Send a transaction. **Only shielded balance is used for sending.** Transparent balance cannot be spent directly — it must be shielded in the wallet first.
 
 **Params**:
 
 - `to: string` - Recipient address
 - `amount: string` - Amount in ZEC (deducted from shielded balance)
+- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only — ignored for transparent addresses)
 
 **Returns**: `Promise<string>` - Transaction ID
 
@@ -254,7 +256,8 @@ Send a transaction. **Only shielded balance is used for sending.** Transparent b
 ```typescript
 const txid = await zcash.sendTransaction({
   to: 'zs1XYZ...',
-  amount: '0.1'
+  amount: '0.1',
+  memo: 'Payment for services'
 })
 ```
 
@@ -437,6 +440,7 @@ interface ZcashBalanceResult extends Balance {
 interface SendTransactionParams {
   to: string
   amount: string
+  memo?: string // Private memo (max 512 bytes UTF-8)
 }
 
 interface TransactionHistoryEntry {
