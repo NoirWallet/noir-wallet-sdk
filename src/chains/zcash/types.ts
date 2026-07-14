@@ -113,6 +113,15 @@ export interface LendingMcaStatus {
   signingMode: LendingSigningMode
 }
 
+export interface TransactionHistoryEntry {
+  txid: string
+  type: string
+  amount: string
+  status: string
+  timestamp: number
+  memo?: string
+}
+
 export type Network = 'mainnet' | 'testnet'
 
 export interface VerifyMessageParams {
