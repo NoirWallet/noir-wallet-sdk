@@ -9,11 +9,12 @@ import {
   type Balance,
   type SignMessageResult,
   type LendingMcaStatus,
-  type SigningMode
+  type SigningMode,
+  type TransactionHistoryEntry
 } from '@noir-wallet/sdk'
 import './App.css'
 
-type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch'
+type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch' | 'history'
 
 const SIGNING_MODES: { id: SigningMode; label: string }[] = [
   { id: 'current', label: 'Current' },
@@ -86,6 +87,131 @@ function ResultField({
   )
 }
 
+function groupTxByDate(
+  txs: TransactionHistoryEntry[]
+): [string, TransactionHistoryEntry[]][] {
+  const map = new Map<string, TransactionHistoryEntry[]>()
+  for (const tx of txs) {
+    const date =
+      tx.timestamp > 0
+        ? new Date(tx.timestamp).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })
+        : 'Unknown Date'
+    const arr = map.get(date)
+    if (arr) arr.push(tx)
+    else map.set(date, [tx])
+  }
+  return Array.from(map.entries())
+}
+
+function formatBalance(value: string): string {
+  return parseFloat(value).toFixed(8)
+}
+
+const TX_ICONS: Record<string, string> = {
+  send: '↗',
+  receive: '↙',
+  shield: '🛡',
+  swap: '🔄',
+  lending_supply: '📥',
+  lending_withdraw: '📤',
+  lending_claim: '🎁'
+}
+const TX_LABELS: Record<string, string> = {
+  send: 'Sent',
+  receive: 'Received',
+  shield: 'Shielded',
+  swap: 'Swapped',
+  lending_supply: 'Supplied',
+  lending_withdraw: 'Withdrawn',
+  lending_claim: 'Claimed'
+}
+const STATUS_LABELS: Record<string, string> = {
+  mined: 'Confirmed',
+  pending: 'Pending',
+  expired: 'Expired',
+  failed: 'Failed'
+}
+
+function TxRow({
+  tx,
+  expanded,
+  onToggle
+}: {
+  tx: TransactionHistoryEntry
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const kind = tx.type || 'receive'
+  return (
+    <>
+      <div className="tx-row" onClick={onToggle}>
+        <div className={`tx-icon ${kind}`}>{TX_ICONS[kind] ?? '↙'}</div>
+        <div className="tx-info">
+          <div className="tx-info-top">
+            <span className="tx-type">{TX_LABELS[kind] ?? kind} ZEC</span>
+            <span className={`tx-status ${tx.status}`}>{STATUS_LABELS[tx.status] ?? tx.status}</span>
+          </div>
+          {tx.timestamp > 0 && (
+            <div className="tx-time">
+              {new Date(tx.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          )}
+        </div>
+        <div className="tx-amount">
+          <span className={`tx-amount-value ${kind}`}>
+            {kind === 'send' || kind === 'lending_supply' || kind === 'swap' ? '-' : '+'}
+            {formatBalance(tx.amount)}
+          </span>
+          <span className="tx-amount-unit">ZEC</span>
+        </div>
+      </div>
+      {expanded && (
+        <div className="tx-detail">
+          <table>
+            <tbody>
+              {Object.entries(tx).map(([key, val]) => {
+                if (val === undefined || val === null || val === '') return null
+                let display: string
+                if (key === 'timestamp' && typeof val === 'number' && val > 0) {
+                  display = new Date(val).toLocaleString('en-US')
+                } else {
+                  display = String(val)
+                }
+                return (
+                  <tr key={key}>
+                    <th>{key}</th>
+                    <td>
+                      {key === 'txid' ? (
+                        <a
+                          href={`https://blockchair.com/zcash/transaction/${display}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-primary)' }}
+                        >
+                          {display}
+                        </a>
+                      ) : (
+                        display
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 function App() {
   const noirWallet = useMemo(() => getNoirWallet(), [])
   const isInstalled = !!noirWallet
@@ -148,12 +274,24 @@ function App() {
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchError, setBatchError] = useState<string | null>(null)
 
+  const [shielding, setShielding] = useState(false)
+  const [shieldResult, setShieldResult] = useState<{ success: boolean; message: string } | null>(
+    null
+  )
+
+  const [txHistory, setTxHistory] = useState<TransactionHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null)
+
   useEffect(() => {
     if (!noirWallet) return
 
     const zcash = noirWallet.zcash
 
     zcash.on('accountsChanged', async (accounts: ZcashAddress | null) => {
+      setTxHistory([])
+      setExpandedTxId(null)
       if (!accounts) {
         setConnected(false)
         setAddresses(null)
@@ -168,6 +306,16 @@ function App() {
         const bal = await zcash.getBalance()
         setBalance(bal)
         setBatchBalances(bal.accounts)
+        setHistoryLoading(true)
+        setHistoryError(null)
+        try {
+          const history = await zcash.getTransactionHistory()
+          setTxHistory(history)
+        } catch (err: any) {
+          setHistoryError(err.message || 'Failed to load history')
+        } finally {
+          setHistoryLoading(false)
+        }
       }
     })
 
@@ -197,6 +345,15 @@ function App() {
           console.warn('Balance fetch failed during autoConnect:', balanceError)
           setBalance({ transparent: '0', shielded: '0' })
         }
+        setHistoryLoading(true)
+        try {
+          const history = await zcash.getTransactionHistory()
+          setTxHistory(history)
+        } catch {
+          /* history is non-critical for autoConnect */
+        } finally {
+          setHistoryLoading(false)
+        }
       } else {
         setConnected(false)
         setAddresses(null)
@@ -222,6 +379,7 @@ function App() {
       const bal = await noirWallet.zcash.getBalance()
       setBalance(bal)
       setBatchBalances(bal.accounts)
+      loadTransactionHistory()
     } catch (err: any) {
       setError(err.message || 'Connection failed')
     } finally {
@@ -242,6 +400,8 @@ function App() {
     setBalance(null)
     setBatchAccounts([])
     setBatchBalances([])
+    setTxHistory([])
+    setExpandedTxId(null)
   }
 
   const refreshBalance = async () => {
@@ -351,8 +511,6 @@ function App() {
     }
   }
 
-  const formatBalance = (value: string) => parseFloat(value).toFixed(8)
-
   const copyToClipboard = async (text: string, type: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -433,12 +591,42 @@ function App() {
     }
   }
 
+  const handleShield = async () => {
+    if (!noirWallet) return
+    setShielding(true)
+    setShieldResult(null)
+    try {
+      const txid = await noirWallet.zcash.shieldFunds()
+      setShieldResult({ success: true, message: `Shield Successful! TXID: ${txid}` })
+      await refreshBalance()
+    } catch (err: any) {
+      setShieldResult({ success: false, message: err.message || 'Shield Failed' })
+    } finally {
+      setShielding(false)
+    }
+  }
+
+  const loadTransactionHistory = async () => {
+    if (!noirWallet) return
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const history = await noirWallet.zcash.getTransactionHistory()
+      setTxHistory(history)
+    } catch (err: any) {
+      setHistoryError(err.message || 'Failed to load history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'send', label: 'Send' },
     { id: 'signing', label: 'Sign & Verify' },
     { id: 'tools', label: 'Tools' },
-    { id: 'batch', label: 'Batch' }
+    { id: 'batch', label: 'Batch' },
+    { id: 'history', label: 'History' }
   ]
 
   return (
@@ -447,7 +635,7 @@ function App() {
         <div className="header-content">
           <div className="logo">
             <a href="/" className="logo-link">
-              <img src="/example/logo.png" alt="Noir Wallet" className="logo-img" />
+              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Noir Wallet" className="logo-img" />
               <span className="logo-text">
                 <span className="logo-noir">Noir </span>
                 <span className="logo-wallet">Wallet</span>
@@ -570,6 +758,32 @@ function App() {
                       </div>
                     )}
                   </div>
+                  {balance && parseFloat(balance.transparent) > 0 && (
+                    <div className="shield-section">
+                      <button
+                        className="btn btn-primary btn-full"
+                        onClick={handleShield}
+                        disabled={shielding}
+                      >
+                        {shielding ? (
+                          <>
+                            <span className="spinner"></span>
+                            Shielding...
+                          </>
+                        ) : (
+                          `🛡️ Shield ${formatBalance(balance.transparent)} ZEC`
+                        )}
+                      </button>
+                      {shieldResult && (
+                        <div
+                          className={`message ${shieldResult.success ? 'success' : 'error'}`}
+                          style={{ marginTop: '8px' }}
+                        >
+                          {shieldResult.message}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -957,6 +1171,49 @@ function App() {
                         <label className="label">Signing Mode</label>
                         <code className="result-code">{mcaStatus.signingMode}</code>
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <div className="tab-panel">
+                <div className="card card-compact">
+                  <div className="card-header">
+                    <h2>Transaction History</h2>
+                    <button
+                      className="btn btn-primary btn-xs"
+                      onClick={loadTransactionHistory}
+                      disabled={historyLoading}
+                    >
+                      {historyLoading ? 'Loading...' : 'Refresh'}
+                    </button>
+                  </div>
+                  {historyLoading && txHistory.length === 0 && (
+                    <div className="message">Loading transactions...</div>
+                  )}
+                  {historyError && <div className="message error">{historyError}</div>}
+                  {txHistory.length === 0 && !historyError && !historyLoading && (
+                    <div className="message">No transactions found.</div>
+                  )}
+                  {txHistory.length > 0 && (
+                    <div className="tx-list">
+                      {groupTxByDate(txHistory).map(([date, txs]) => (
+                        <div key={date}>
+                          <div className="tx-date-group">{date}</div>
+                          {txs.map((tx, i) => (
+                            <TxRow
+                              key={`${tx.txid}-${i}`}
+                              tx={tx}
+                              expanded={expandedTxId === tx.txid}
+                              onToggle={() =>
+                                setExpandedTxId(prev => (prev === tx.txid ? null : tx.txid))
+                              }
+                            />
+                          ))}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

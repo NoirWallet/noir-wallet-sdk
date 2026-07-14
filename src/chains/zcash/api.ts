@@ -11,7 +11,8 @@ import type {
   SignMessageResult,
   SigningMode,
   LendingMcaStatus,
-  Network
+  Network,
+  TransactionHistoryEntry
 } from './types'
 
 export class ZcashAPI {
@@ -88,6 +89,11 @@ export class ZcashAPI {
     return this.normalizeBalance(res)
   }
 
+  /** Get the connected wallet's transparent and shielded addresses. */
+  async getAddresses(): Promise<ZcashAddress> {
+    return this.provider.request({ method: 'zcash_getAddresses' })
+  }
+
   async getPublicKey(options?: SignMessageOptions): Promise<{
     pubkey: string
     address: string
@@ -114,6 +120,16 @@ export class ZcashAPI {
       method: 'zcash_signMessage',
       params: [message, { signingMode }]
     })
+  }
+
+  /** Shield transparent funds to the private (shielded) balance. Requires user approval. */
+  async shieldFunds(): Promise<string> {
+    return this.provider.request({ method: 'zcash_shieldFunds' })
+  }
+
+  /** Fetch transaction history (on-chain + local pending). */
+  async getTransactionHistory(): Promise<TransactionHistoryEntry[]> {
+    return this.provider.request({ method: 'zcash_getTransactionHistory' })
   }
 
   /** @deprecated Network is determined at build time. Install the testnet extension instead. */

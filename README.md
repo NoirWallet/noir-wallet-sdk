@@ -1,5 +1,8 @@
 # Noir Wallet SDK
 
+> **For regular use**, install Noir Wallet from the [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn).
+> Preview builds for testing are available on the [Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) page.
+
 TypeScript SDK and example dApp for integrating with Noir Wallet.
 
 ## Install
@@ -283,17 +286,55 @@ console.log('Signature:', derived.signature)
 console.log('Origin Address:', derived.originAddress)
 ```
 
-#### `switchNetwork(network)`
+#### `getAddresses()`
 
-Switch between mainnet and testnet.
+Get the connected wallet's transparent and shielded addresses.
 
-**Params**: `network: 'mainnet' | 'testnet'`
-
-**Returns**: `Promise<boolean>`
+**Returns**: `Promise<ZcashAddress>` - `{ transparent, shielded }`
 
 ```typescript
-await zcash.switchNetwork('testnet')
+const addresses = await zcash.getAddresses()
+console.log('Transparent:', addresses.transparent)
+console.log('Shielded:', addresses.shielded)
 ```
+
+#### `shieldFunds()`
+
+Shield transparent funds to the private (shielded) balance. Requires user approval via popup.
+
+**Returns**: `Promise<string>` - Transaction ID
+
+```typescript
+const txid = await zcash.shieldFunds()
+console.log('Shield transaction:', txid)
+```
+
+> **Note**: This moves all transparent balance into the shielded pool for enhanced privacy. The user will see an approval popup.
+
+#### `getTransactionHistory()`
+
+Fetch transaction history from the wallet (includes on-chain and local pending transactions).
+
+**Returns**: `Promise<TransactionHistoryEntry[]>`
+
+Each entry contains:
+- `txid`: Transaction hash (hex)
+- `type`: `'send'` | `'receive'` | `'shield'` | `'swap'` | `'lending_supply'` | `'lending_withdraw'` | `'lending_claim'`
+- `amount`: Amount in ZEC
+- `status`: `'mined'` | `'pending'` | `'failed'`
+- `timestamp`: Unix timestamp in milliseconds
+- `memo`: Optional memo string
+
+```typescript
+const history = await zcash.getTransactionHistory()
+history.forEach(tx => {
+  console.log(`${tx.type} ${tx.amount} ZEC - ${tx.status}`)
+})
+```
+
+#### `switchNetwork(network)` *(deprecated)*
+
+> **Deprecated**: Mainnet and testnet are now separate extension builds. Install the testnet extension for testnet usage. This method is retained for backward compatibility but has no effect.
 
 ### Utility Functions
 
@@ -396,6 +437,15 @@ interface ZcashBalanceResult extends Balance {
 interface SendTransactionParams {
   to: string
   amount: string
+}
+
+interface TransactionHistoryEntry {
+  txid: string
+  type: string      // 'send' | 'receive' | 'shield' | 'swap' | 'lending_supply' | 'lending_withdraw' | 'lending_claim'
+  amount: string    // ZEC amount
+  status: string    // 'mined' | 'pending' | 'failed'
+  timestamp: number // Unix ms
+  memo?: string
 }
 
 type SigningMode = 'derived' | 'current'
