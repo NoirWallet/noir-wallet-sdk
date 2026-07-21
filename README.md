@@ -72,7 +72,7 @@ if (!accounts) {
 const balance = await zcash.getBalance()
 console.log('Transparent:', balance.transparent, 'ZEC')
 console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Precise transferable amount
+console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
 
 // Get public key
 const publicKeyInfo = await zcash.getPublicKey()
@@ -81,10 +81,16 @@ if (publicKeyInfo) {
   console.log('Address:', publicKeyInfo.address)
 }
 
+// Calculate the exact Max after the destination and memo are known
+const max = await zcash.getMaxTransfer({
+  to: 'u1XYZ...',
+  memo: 'Payment for services'
+})
+
 // Send transaction with optional memo
 const txid = await zcash.sendTransaction({
-  to: 'zs1XYZ...',
-  amount: '0.1',
+  to: 'u1XYZ...',
+  amount: max.maxAmount,
   memo: 'Payment for services'
 })
 console.log('Transaction sent:', txid)
@@ -191,7 +197,7 @@ Get wallet balance.
 // Primary account balance (backward compatible)
 const balance = await zcash.getBalance()
 console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Recommended for max send amount
+console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
 
 // Per-wallet balances
 balance.accounts.forEach(b => {
@@ -207,10 +213,45 @@ const second = await zcash.getBalance(balance.accounts[1]?.id)
 - `transparent`: Transparent address balance
 - `shielded`: Shielded balance (Sapling + Orchard)
 - `total`: Total balance (transparent + shielded)
-- `available`: **Precise transferable amount** - Maximum amount that can be sent considering UTXO selection, dynamic fees, and dust threshold. Calculated during background sync using WASM's `get_max_transferable_amount` method.
+- `available`: A destination-agnostic, cached compatibility value. It does not account for the final recipient, memo, selected fee tier, or exact transaction action count. Use `getMaxTransfer()` for an exact Max value once those inputs are known.
 - `accounts`: Balance of every authorized account; each entry carries a `synced` flag (`false` = cached/zero fallback because the wallet is locked or that account hasn't synced yet).
 
 > **Multi-wallet access & compatibility:** `connect()` / `getAccounts()` / `getBalance()` are backward compatible — their original top-level fields are unchanged, and the `accounts` array is purely additive. dApps on **older extensions** that don't return `accounts` still work: the SDK normalizes the single-account response into a one-element `accounts` array, so your code path is identical regardless of extension version. To react to changes, listen for `accountsChanged` and re-call `getAccounts()` / `getBalance()` to refresh the array.
+
+#### `getMaxTransfer(params)`
+
+Calculate the exact transferable amount and proposal fee for a specific recipient, memo, and fee tier using the current connected account.
+
+**Params**:
+
+- `to: string` - Recipient address
+- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only)
+- `feeTier?: 'standard' | 'fast'` - Fee tier used for the estimate; defaults to `standard`
+
+**Returns**: `Promise<MaxTransferEstimate>`
+
+- `maxAmount: string` - Exact payment amount in ZEC
+- `fee: string` - Fee for the exact send-max proposal in ZEC
+
+```typescript
+const params = {
+  to: 'u1XYZ...',
+  memo: 'Payment for services',
+  feeTier: 'standard' as const
+}
+const { maxAmount, fee } = await zcash.getMaxTransfer(params)
+
+console.log('Max:', maxAmount, 'ZEC')
+console.log('Fee:', fee, 'ZEC')
+
+const txid = await zcash.sendTransaction({
+  to: params.to,
+  amount: maxAmount,
+  memo: params.memo
+})
+```
+
+> **Compatibility:** This method is additive. Existing dApps and older SDK versions continue to use `connect()`, `getBalance()`, and `sendTransaction()` unchanged after the extension is updated. A dApp only needs to upgrade the SDK when it wants recipient-aware exact Max calculation. `getMaxTransfer()` requires an extension version that supports `zcash_getMaxTransfer`; do not call it when supporting older extension versions unless the dApp handles an unsupported-method error. Legacy dApps can continue using `balance.available`, but it is a conservative fallback rather than an exact recipient-aware Max.
 
 #### `getPublicKey(options?)`
 
@@ -255,7 +296,7 @@ Send a transaction. **Only shielded balance is used for sending.** Transparent b
 
 ```typescript
 const txid = await zcash.sendTransaction({
-  to: 'zs1XYZ...',
+  to: 'u1XYZ...',
   amount: '0.1',
   memo: 'Payment for services'
 })
@@ -404,7 +445,7 @@ interface Balance {
   transparent: string
   shielded: string
   total?: string
-  available?: string // Precise max transferable amount
+  available?: string // Destination-agnostic compatibility value
 }
 
 // One account from a batch (multi-wallet) authorization.
@@ -441,6 +482,19 @@ interface SendTransactionParams {
   to: string
   amount: string
   memo?: string // Private memo (max 512 bytes UTF-8)
+}
+
+type FeeTier = 'standard' | 'fast'
+
+interface MaxTransferParams {
+  to: string
+  memo?: string
+  feeTier?: FeeTier
+}
+
+interface MaxTransferEstimate {
+  maxAmount: string
+  fee: string
 }
 
 interface TransactionHistoryEntry {

@@ -7,6 +7,7 @@ import {
   type ZcashAccount,
   type ZcashAccountBalance,
   type Balance,
+  type MaxTransferEstimate,
   type SignMessageResult,
   type LendingMcaStatus,
   type SigningMode,
@@ -231,6 +232,8 @@ function App() {
 
   const [sendForm, setSendForm] = useState({ to: '', amount: '', memo: '' })
   const [sending, setSending] = useState(false)
+  const [estimatingMax, setEstimatingMax] = useState(false)
+  const [maxEstimate, setMaxEstimate] = useState<MaxTransferEstimate | null>(null)
   const [txResult, setTxResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const [signingMode, setSigningMode] = useState<SigningMode>('current')
@@ -435,11 +438,31 @@ function App() {
       })
       setTxResult({ success: true, message: `Transaction Successful! TXID: ${txid}` })
       setSendForm({ to: '', amount: '', memo: '' })
+      setMaxEstimate(null)
       await refreshBalance()
     } catch (err: any) {
       setTxResult({ success: false, message: err.message || 'Transaction Failed' })
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleMaxTransfer = async () => {
+    if (!noirWallet || !sendForm.to) return
+    setEstimatingMax(true)
+    setMaxEstimate(null)
+    setTxResult(null)
+    try {
+      const estimate = await noirWallet.zcash.getMaxTransfer({
+        to: sendForm.to,
+        memo: sendForm.memo || undefined
+      })
+      setMaxEstimate(estimate)
+      setSendForm(current => ({ ...current, amount: estimate.maxAmount }))
+    } catch (err: any) {
+      setTxResult({ success: false, message: err.message || 'Max estimation failed' })
+    } finally {
+      setEstimatingMax(false)
     }
   }
 
@@ -759,7 +782,7 @@ function App() {
                     </div>
                     {balance?.available && (
                       <div className="balance-item balance-item-full">
-                        <span className="balance-label">Available</span>
+                        <span className="balance-label">Available (cached fallback)</span>
                         <span className="balance-value highlight">
                           {formatBalance(balance.available)}
                         </span>
@@ -801,7 +824,7 @@ function App() {
                 <div className="card card-compact">
                   <h2>📤 Send Transaction</h2>
                   <p className="card-hint">
-                    Available:{' '}
+                    Cached available:{' '}
                     <strong>
                       {formatBalance(balance?.available || balance?.shielded || '0')} ZEC
                     </strong>
@@ -820,7 +843,10 @@ function App() {
                         className="input input-sm"
                         placeholder="Enter Zcash Address"
                         value={sendForm.to}
-                        onChange={e => setSendForm({ ...sendForm, to: e.target.value })}
+                        onChange={e => {
+                          setMaxEstimate(null)
+                          setSendForm({ ...sendForm, to: e.target.value })
+                        }}
                         required
                       />
                     </div>
@@ -833,9 +859,25 @@ function App() {
                         step="0.00000001"
                         min="0"
                         value={sendForm.amount}
-                        onChange={e => setSendForm({ ...sendForm, amount: e.target.value })}
+                        onChange={e => {
+                          setMaxEstimate(null)
+                          setSendForm({ ...sendForm, amount: e.target.value })
+                        }}
                         required
                       />
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs max-transfer-btn"
+                        onClick={handleMaxTransfer}
+                        disabled={estimatingMax || !sendForm.to}
+                      >
+                        {estimatingMax ? 'Calculating...' : 'Calculate Exact Max'}
+                      </button>
+                      {maxEstimate && (
+                        <span className="max-transfer-fee">
+                          Proposal fee: {maxEstimate.fee} ZEC
+                        </span>
+                      )}
                     </div>
                     <div className="form-group">
                       <label className="label">Memo (optional, max 512 bytes)</label>
@@ -846,7 +888,10 @@ function App() {
                         value={sendForm.memo}
                         onChange={e => {
                           const encoded = new TextEncoder().encode(e.target.value)
-                          if (encoded.length <= 512) setSendForm({ ...sendForm, memo: e.target.value })
+                          if (encoded.length <= 512) {
+                            setMaxEstimate(null)
+                            setSendForm({ ...sendForm, memo: e.target.value })
+                          }
                         }}
                         style={{ resize: 'none' }}
                       />

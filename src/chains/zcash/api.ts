@@ -7,6 +7,8 @@ import type {
   ZcashBalanceResult,
   Balance,
   SendTransactionParams,
+  MaxTransferParams,
+  MaxTransferEstimate,
   SignMessageOptions,
   SignMessageResult,
   SigningMode,
@@ -87,6 +89,14 @@ export class ZcashAPI {
       params: accountId ? [{ accountId }] : []
     })
     return this.normalizeBalance(res)
+  }
+
+  /** Get the exact send-max amount and fee for a destination and fee tier. */
+  async getMaxTransfer(params: MaxTransferParams): Promise<MaxTransferEstimate> {
+    return this.provider.request({
+      method: 'zcash_getMaxTransfer',
+      params: [params]
+    })
   }
 
   /** Get the connected wallet's transparent and shielded addresses. */

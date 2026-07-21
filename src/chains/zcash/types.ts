@@ -75,6 +75,23 @@ export interface SendTransactionParams {
   memo?: string
 }
 
+export type FeeTier = 'standard' | 'fast'
+
+export interface MaxTransferParams {
+  to: string
+  /** Private memo attached to shielded transactions (max 512 bytes UTF-8). */
+  memo?: string
+  /** Defaults to the ZIP-317 standard tier. */
+  feeTier?: FeeTier
+}
+
+export interface MaxTransferEstimate {
+  /** Exact spendable payment for this destination and fee tier, in ZEC. */
+  maxAmount: string
+  /** Fee of the exact send-max proposal, in ZEC. */
+  fee: string
+}
+
 export interface TransactionReceipt {
   txid: string
   from: string
