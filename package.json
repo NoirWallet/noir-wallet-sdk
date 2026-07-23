@@ -21,7 +21,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist",
+    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --clean",
     "dev": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --watch",
     "type-check": "tsc --noEmit",
     "pack:dry": "npm pack --dry-run",

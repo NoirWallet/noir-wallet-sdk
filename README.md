@@ -28,6 +28,10 @@ pnpm example:dev
 
 Noir Wallet must be installed in the browser for wallet connection flows.
 
+> **Extension compatibility:** The optional `fundingSource` parameter for
+> `getMaxTransfer()` and `sendTransaction()` requires Noir Wallet extension
+> **1.0.27 or later**. When omitted, the SDK continues to use shielded funds.
+
 ## SDK API
 
 TypeScript SDK for integrating with Noir Wallet Chrome Extension.
@@ -81,17 +85,22 @@ if (publicKeyInfo) {
   console.log('Address:', publicKeyInfo.address)
 }
 
-// Calculate the exact Max after the destination and memo are known
+// Use the same funding source for Max and Send
+const fundingSource = 'transparent' as const
+
+// Calculate the exact Max after the destination, memo, and source are known
 const max = await zcash.getMaxTransfer({
   to: 'u1XYZ...',
-  memo: 'Payment for services'
+  memo: 'Payment for services',
+  fundingSource
 })
 
 // Send transaction with optional memo
 const txid = await zcash.sendTransaction({
   to: 'u1XYZ...',
   amount: max.maxAmount,
-  memo: 'Payment for services'
+  memo: 'Payment for services',
+  fundingSource
 })
 console.log('Transaction sent:', txid)
 
@@ -227,6 +236,7 @@ Calculate the exact transferable amount and proposal fee for a specific recipien
 - `to: string` - Recipient address
 - `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only)
 - `feeTier?: 'standard' | 'fast'` - Fee tier used for the estimate; defaults to `standard`
+- `fundingSource?: 'shielded' | 'transparent'` - Balance used for the estimate; defaults to `shielded`
 
 **Returns**: `Promise<MaxTransferEstimate>`
 
@@ -237,7 +247,8 @@ Calculate the exact transferable amount and proposal fee for a specific recipien
 const params = {
   to: 'u1XYZ...',
   memo: 'Payment for services',
-  feeTier: 'standard' as const
+  feeTier: 'standard' as const,
+  fundingSource: 'transparent' as const
 }
 const { maxAmount, fee } = await zcash.getMaxTransfer(params)
 
@@ -247,11 +258,16 @@ console.log('Fee:', fee, 'ZEC')
 const txid = await zcash.sendTransaction({
   to: params.to,
   amount: maxAmount,
-  memo: params.memo
+  memo: params.memo,
+  fundingSource: params.fundingSource
 })
 ```
 
-> **Compatibility:** This method is additive. Existing dApps and older SDK versions continue to use `connect()`, `getBalance()`, and `sendTransaction()` unchanged after the extension is updated. A dApp only needs to upgrade the SDK when it wants recipient-aware exact Max calculation. `getMaxTransfer()` requires an extension version that supports `zcash_getMaxTransfer`; do not call it when supporting older extension versions unless the dApp handles an unsupported-method error. Legacy dApps can continue using `balance.available`, but it is a conservative fallback rather than an exact recipient-aware Max.
+> **Compatibility:** `fundingSource` requires Noir Wallet extension **1.0.27 or
+> later**. Omit it to retain the existing shielded-only behavior. Do not request
+> transparent funding from an older extension because it does not understand the
+> parameter. Legacy dApps can continue using `balance.available`, but it is a
+> conservative fallback rather than an exact recipient-aware Max.
 
 #### `getPublicKey(options?)`
 
@@ -282,23 +298,29 @@ console.log('Main Address:', derivedKey.originAddress)
 
 #### `sendTransaction(params)`
 
-Send a transaction. **Only shielded balance is used for sending.** Transparent balance cannot be spent directly — it must be shielded in the wallet first.
+Send a transaction using shielded funds by default, or explicitly select transparent funds.
 
 **Params**:
 
 - `to: string` - Recipient address
-- `amount: string` - Amount in ZEC (deducted from shielded balance)
-- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only — ignored for transparent addresses)
+- `amount: string` - Amount in ZEC
+- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only; not allowed for transparent recipients)
+- `fundingSource?: 'shielded' | 'transparent'` - Balance used to fund the transaction; defaults to `shielded`
 
 **Returns**: `Promise<string>` - Transaction ID
 
-> **Note:** All sends use shielded balance. If you have transparent balance, please shield it in the wallet first.
+> **Privacy:** Transparent funding reveals and may link the selected transparent
+> UTXOs on-chain. It is not supported by Keystone hardware wallets.
+>
+> **Compatibility:** `fundingSource` is supported by Noir Wallet extension
+> **1.0.27 or later**.
 
 ```typescript
 const txid = await zcash.sendTransaction({
   to: 'u1XYZ...',
   amount: '0.1',
-  memo: 'Payment for services'
+  memo: 'Payment for services',
+  fundingSource: 'transparent'
 })
 ```
 

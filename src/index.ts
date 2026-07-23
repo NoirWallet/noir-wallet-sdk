@@ -24,6 +24,7 @@ export type {
   ZcashConnectResult,
   ZcashBalanceResult,
   Balance,
+  FundingSource,
   SendTransactionParams,
   FeeTier,
   MaxTransferParams,
