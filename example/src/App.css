@@ -307,6 +307,17 @@
   font-size: 13px;
 }
 
+.max-transfer-btn {
+  align-self: flex-end;
+  margin-top: 6px;
+}
+
+.max-transfer-fee {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 /* Mode Selector */
 .mode-selector {
   display: flex;

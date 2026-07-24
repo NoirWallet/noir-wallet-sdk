@@ -68,11 +68,41 @@ export interface ZcashBalanceResult extends Balance {
   accounts: ZcashAccountBalance[]
 }
 
+export type FundingSource = 'shielded' | 'transparent'
+
 export interface SendTransactionParams {
   to: string
   amount: string
   /** Private memo attached to shielded transactions (max 512 bytes UTF-8). */
   memo?: string
+  /**
+   * Balance used to fund the transaction. Transparent funding reveals and may link
+   * the selected transparent UTXOs. Keystone does not support transparent funding.
+   */
+  fundingSource?: FundingSource
+}
+
+export type FeeTier = 'standard' | 'fast'
+
+export interface MaxTransferParams {
+  to: string
+  /** Private memo attached to shielded transactions (max 512 bytes UTF-8). */
+  memo?: string
+  /** Defaults to the ZIP-317 standard tier. */
+  feeTier?: FeeTier
+  /**
+   * Balance used for the exact Max estimate. Transparent funding reveals and may link
+   * the selected transparent UTXOs, and is not supported by Keystone. This must match
+   * the source passed to sendTransaction().
+   */
+  fundingSource?: FundingSource
+}
+
+export interface MaxTransferEstimate {
+  /** Exact spendable payment for this destination and fee tier, in ZEC. */
+  maxAmount: string
+  /** Fee of the exact send-max proposal, in ZEC. */
+  fee: string
 }
 
 export interface TransactionReceipt {

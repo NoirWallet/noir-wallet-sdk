@@ -7,6 +7,8 @@ import {
   type ZcashAccount,
   type ZcashAccountBalance,
   type Balance,
+  type FundingSource,
+  type MaxTransferEstimate,
   type SignMessageResult,
   type LendingMcaStatus,
   type SigningMode,
@@ -109,6 +111,10 @@ function groupTxByDate(
 
 function formatBalance(value: string): string {
   return parseFloat(value).toFixed(8)
+}
+
+function isTransparentRecipient(address: string): boolean {
+  return /^t[13m]/.test(address.trim())
 }
 
 const TX_ICONS: Record<string, string> = {
@@ -229,8 +235,15 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
-  const [sendForm, setSendForm] = useState({ to: '', amount: '', memo: '' })
+  const [sendForm, setSendForm] = useState<{
+    to: string
+    amount: string
+    memo: string
+    fundingSource: FundingSource
+  }>({ to: '', amount: '', memo: '', fundingSource: 'shielded' })
   const [sending, setSending] = useState(false)
+  const [estimatingMax, setEstimatingMax] = useState(false)
+  const [maxEstimate, setMaxEstimate] = useState<MaxTransferEstimate | null>(null)
   const [txResult, setTxResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const [signingMode, setSigningMode] = useState<SigningMode>('current')
@@ -431,15 +444,37 @@ function App() {
       const txid = await noirWallet.zcash.sendTransaction({
         to: sendForm.to,
         amount: sendForm.amount,
-        memo: sendForm.memo || undefined
+        memo: isTransparentRecipient(sendForm.to) ? undefined : sendForm.memo || undefined,
+        fundingSource: sendForm.fundingSource
       })
       setTxResult({ success: true, message: `Transaction Successful! TXID: ${txid}` })
-      setSendForm({ to: '', amount: '', memo: '' })
+      setSendForm({ to: '', amount: '', memo: '', fundingSource: 'shielded' })
+      setMaxEstimate(null)
       await refreshBalance()
     } catch (err: any) {
       setTxResult({ success: false, message: err.message || 'Transaction Failed' })
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleMaxTransfer = async () => {
+    if (!noirWallet || !sendForm.to) return
+    setEstimatingMax(true)
+    setMaxEstimate(null)
+    setTxResult(null)
+    try {
+      const estimate = await noirWallet.zcash.getMaxTransfer({
+        to: sendForm.to,
+        memo: isTransparentRecipient(sendForm.to) ? undefined : sendForm.memo || undefined,
+        fundingSource: sendForm.fundingSource
+      })
+      setMaxEstimate(estimate)
+      setSendForm(current => ({ ...current, amount: estimate.maxAmount }))
+    } catch (err: any) {
+      setTxResult({ success: false, message: err.message || 'Max estimation failed' })
+    } finally {
+      setEstimatingMax(false)
     }
   }
 
@@ -759,7 +794,7 @@ function App() {
                     </div>
                     {balance?.available && (
                       <div className="balance-item balance-item-full">
-                        <span className="balance-label">Available</span>
+                        <span className="balance-label">Available (cached fallback)</span>
                         <span className="balance-value highlight">
                           {formatBalance(balance.available)}
                         </span>
@@ -801,18 +836,37 @@ function App() {
                 <div className="card card-compact">
                   <h2>📤 Send Transaction</h2>
                   <p className="card-hint">
-                    Available:{' '}
+                    Cached available:{' '}
                     <strong>
                       {formatBalance(balance?.available || balance?.shielded || '0')} ZEC
                     </strong>
                   </p>
-                  {balance && parseFloat(balance.transparent) > 0 && (
-                    <div className="message warning">
-                      ⚠️ Transparent balance ({formatBalance(balance.transparent)} ZEC) cannot be
-                      sent here. Shield it in the extension first.
-                    </div>
-                  )}
                   <form onSubmit={handleSend} className="form-stack">
+                    <div className="form-group">
+                      <label className="label">Funding Source</label>
+                      <select
+                        className="input input-sm"
+                        value={sendForm.fundingSource}
+                        onChange={e => {
+                          const fundingSource: FundingSource =
+                            e.target.value === 'transparent' ? 'transparent' : 'shielded'
+                          setMaxEstimate(null)
+                          setSendForm({
+                            ...sendForm,
+                            fundingSource,
+                            amount: ''
+                          })
+                        }}
+                      >
+                        <option value="shielded">Shielded balance</option>
+                        <option value="transparent">Transparent balance</option>
+                      </select>
+                      {sendForm.fundingSource === 'transparent' && (
+                        <span className="max-transfer-fee">
+                          Transparent spending reveals and may link selected UTXOs on-chain.
+                        </span>
+                      )}
+                    </div>
                     <div className="form-group">
                       <label className="label">Recipient Address</label>
                       <input
@@ -820,7 +874,15 @@ function App() {
                         className="input input-sm"
                         placeholder="Enter Zcash Address"
                         value={sendForm.to}
-                        onChange={e => setSendForm({ ...sendForm, to: e.target.value })}
+                        onChange={e => {
+                          const to = e.target.value
+                          setMaxEstimate(null)
+                          setSendForm({
+                            ...sendForm,
+                            to,
+                            memo: isTransparentRecipient(to) ? '' : sendForm.memo
+                          })
+                        }}
                         required
                       />
                     </div>
@@ -833,23 +895,52 @@ function App() {
                         step="0.00000001"
                         min="0"
                         value={sendForm.amount}
-                        onChange={e => setSendForm({ ...sendForm, amount: e.target.value })}
+                        onChange={e => {
+                          setMaxEstimate(null)
+                          setSendForm({ ...sendForm, amount: e.target.value })
+                        }}
                         required
                       />
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs max-transfer-btn"
+                        onClick={handleMaxTransfer}
+                        disabled={estimatingMax || !sendForm.to}
+                      >
+                        {estimatingMax ? 'Calculating...' : 'Calculate Exact Max'}
+                      </button>
+                      {maxEstimate && (
+                        <span className="max-transfer-fee">
+                          Proposal fee: {maxEstimate.fee} ZEC
+                        </span>
+                      )}
                     </div>
                     <div className="form-group">
                       <label className="label">Memo (optional, max 512 bytes)</label>
                       <textarea
                         className="input input-sm"
-                        placeholder="Add a private memo"
+                        placeholder={
+                          isTransparentRecipient(sendForm.to)
+                            ? 'Memos are unavailable for transparent recipients'
+                            : 'Add a private memo'
+                        }
                         rows={2}
                         value={sendForm.memo}
+                        disabled={isTransparentRecipient(sendForm.to)}
                         onChange={e => {
                           const encoded = new TextEncoder().encode(e.target.value)
-                          if (encoded.length <= 512) setSendForm({ ...sendForm, memo: e.target.value })
+                          if (encoded.length <= 512) {
+                            setMaxEstimate(null)
+                            setSendForm({ ...sendForm, memo: e.target.value })
+                          }
                         }}
                         style={{ resize: 'none' }}
                       />
+                      {isTransparentRecipient(sendForm.to) && (
+                        <span className="max-transfer-fee">
+                          Transparent recipients do not support memos.
+                        </span>
+                      )}
                     </div>
                     <button
                       type="submit"

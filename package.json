@@ -1,6 +1,6 @@
 {
   "name": "@noir-wallet/sdk",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "TypeScript SDK for Noir Wallet dApp integration",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -21,7 +21,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist",
+    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --clean",
     "dev": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --watch",
     "type-check": "tsc --noEmit",
     "pack:dry": "npm pack --dry-run",
