@@ -46,9 +46,8 @@ The builds use different extension IDs and isolated wallet data. The SDK does no
 
 ```bash
 pnpm add @noir-wallet/sdk
+npm install @noir-wallet/sdk
 ```
-
-The package also works with npm, Yarn, and Bun if your application uses a different package manager.
 
 ## Quick start
 
