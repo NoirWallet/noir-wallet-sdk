@@ -5,7 +5,8 @@ Typed TypeScript SDK for connecting web apps to the Noir Wallet browser extensio
 - [Integration guide](https://docs.zknoir.com/developers)
 - [Provider API reference](https://docs.zknoir.com/developers/provider-api)
 - [Example dApp](https://github.com/NoirWallet/noir-wallet-sdk/tree/main/example)
-- [Install Noir Wallet](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn)
+- [Install Noir Wallet for mainnet](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn)
+- [Download the testnet build](https://github.com/NoirWallet/noir-wallet-sdk/releases)
 
 ## What the SDK does
 
@@ -20,7 +21,28 @@ Typed TypeScript SDK for connecting web apps to the Noir Wallet browser extensio
 
 The SDK is browser-only. It does not create or custody wallets, and Noir Wallet must be installed for provider calls to work.
 
-## Install
+## Install an extension build
+
+Mainnet and testnet are separate Noir Wallet extensions:
+
+| Network | Download | Use |
+| --- | --- | --- |
+| Mainnet | [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn) | Production apps and real ZEC |
+| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) | Development and test ZEC |
+
+To install testnet:
+
+1. Open the official Releases page and choose the release you want to test.
+2. Download the asset whose filename ends with `-testnet.zip`.
+3. Unzip the downloaded file.
+4. Open `chrome://extensions`, enable **Developer mode**, and select **Load unpacked**.
+5. Choose the extracted extension directory and confirm the installed name is **[Testnet] Noir Wallet**.
+
+Only install testnet ZIP files published by the `NoirWallet/noir-wallet-sdk` repository. The mainnet asset does not contain `-testnet` in its filename.
+
+The builds use different extension IDs and isolated wallet data. The SDK does not switch networks at runtime; `switchNetwork()` is deprecated and always throws.
+
+## Install the SDK
 
 ```bash
 pnpm add @noir-wallet/sdk
