@@ -7,6 +7,7 @@ import {
   type BitcoinProvider,
   type EvmProvider
 } from '@noir-wallet/sdk'
+import { ContractBench } from './ContractBench'
 
 export type ExampleProviderId = 'zcash' | 'evm' | 'bitcoin'
 
@@ -442,6 +443,13 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
             </div>
           </form>
         </section>
+        <ContractBench
+          provider={provider}
+          account={account}
+          chainId={chainId}
+          busy={busy}
+          run={run}
+        />
       </div>
       {result && <div className="message success provider-result">{result}</div>}
       {error && <div className="message error provider-result">{error}</div>}

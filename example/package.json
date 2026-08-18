@@ -20,7 +20,9 @@
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.6.0",
+    "solc": "^0.8.36",
     "typescript": "^5.8.3",
+    "viem": "^2.45.3",
     "vite": "^7.0.0"
   }
 }
