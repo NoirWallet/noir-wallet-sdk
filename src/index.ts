@@ -1,4 +1,6 @@
 export { getNoirWallet, isNoirWalletInstalled } from './provider'
+export { detectEvmProvider, getEvmProvider } from './chains/evm'
+export { detectBitcoinProvider, getBitcoinProvider } from './chains/bitcoin'
 
 export type {
   NoirWalletProvider,
@@ -7,9 +9,32 @@ export type {
   ProviderRpcError
 } from './types'
 
+export type {
+  DetectEvmProviderOptions,
+  Eip6963ProviderDetail,
+  Eip6963ProviderInfo,
+  EvmProvider,
+  EvmProviderListener,
+  EvmRequestArguments
+} from './chains/evm'
+
+export type {
+  BitcoinBalance,
+  BitcoinChain,
+  BitcoinChainInfo,
+  BitcoinConnectResult,
+  BitcoinNetwork,
+  BitcoinProvider,
+  BitcoinProviderListener,
+  BitcoinRequestArguments,
+  BitcoinSignPsbtOptions,
+  DetectBitcoinProviderOptions
+} from './chains/bitcoin'
+
 export {
   getZcashProvider,
   detectProvider,
+  ZcashClient,
   ZcashAPI,
   publicKeyToAddress,
   verifyMessageSignature

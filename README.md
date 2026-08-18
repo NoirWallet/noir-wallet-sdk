@@ -20,7 +20,9 @@ pnpm --filter @noir-wallet/example build
 
 ## Example
 
-The example app lives in `example/` and uses the workspace SDK package:
+The example app lives in `example/` and uses the workspace SDK package. It exposes the same
+Zcash, EVM, and Bitcoin provider flows that a dApp uses, including connection, balance queries,
+transactions, message signing, EIP-712, BIP-322, and PSBT signing:
 
 ```bash
 pnpm example:dev
@@ -60,6 +62,7 @@ if (!noirWallet) {
 }
 
 const zcash = noirWallet.zcash
+// `zcash` is a ZcashClient: the typed high-level SDK wrapper around the injected provider.
 
 // Check existing connection (silent, no popup)
 const accounts = await zcash.getAccounts()
@@ -109,6 +112,56 @@ const result = await zcash.signMessage('Hello World')
 console.log('Signature:', result.signature)
 console.log('Address:', result.address)
 ```
+
+`ZcashClient` is the public high-level client type. The former `ZcashAPI` export remains as a
+deprecated compatibility alias, so existing integrations can upgrade without a breaking rename.
+
+### EVM (EIP-1193 and EIP-6963)
+
+Use the SDK discovery helper instead of assuming Noir Wallet owns `window.ethereum`. This keeps
+the integration correct when several EVM wallets are installed.
+
+```typescript
+import { detectEvmProvider } from '@noir-wallet/sdk'
+
+const ethereum = await detectEvmProvider()
+const [address] = await ethereum.request<string[]>({ method: 'eth_requestAccounts' })
+const chainId = await ethereum.request<string>({ method: 'eth_chainId' })
+
+const signature = await ethereum.request<string>({
+  method: 'personal_sign',
+  params: ['0x48656c6c6f204e6f6972', address]
+})
+
+const transactionHash = await ethereum.request<string>({
+  method: 'eth_sendTransaction',
+  params: [{ from: address, to: '0x…', value: '0x38d7ea4c68000' }]
+})
+
+console.log({ chainId, signature, transactionHash })
+```
+
+`wallet_switchEthereumChain` switches only among EVM networks released for the active global
+Mainnet/Testnet Mode. Changing the global mode is a wallet setting and restarts the extension.
+
+### Bitcoin
+
+```typescript
+import { detectBitcoinProvider } from '@noir-wallet/sdk'
+
+const bitcoin = await detectBitcoinProvider()
+const { address, publicKey } = await bitcoin.connect()
+const balance = await bitcoin.getBalance()
+
+const signature = await bitcoin.signMessage('Hello Noir Bitcoin', 'bip322-simple')
+const transactionId = await bitcoin.sendBitcoin('bc1q…', 1000)
+
+console.log({ address, publicKey, balance, signature, transactionId })
+```
+
+`signPsbt(psbtHex, { autoFinalized: false })` returns the signed PSBT as hex. Bitcoin network
+switch methods validate the active network only; global Mainnet/Testnet Mode is changed in Noir
+Wallet settings.
 
 ### Detect Provider
 
@@ -384,6 +437,7 @@ Fetch transaction history from the wallet (includes on-chain and local pending t
 **Returns**: `Promise<TransactionHistoryEntry[]>`
 
 Each entry contains:
+
 - `txid`: Transaction hash (hex)
 - `type`: `'send'` | `'receive'` | `'shield'` | `'swap'` | `'lending_supply'` | `'lending_withdraw'` | `'lending_claim'`
 - `amount`: Amount in ZEC
@@ -398,9 +452,11 @@ history.forEach(tx => {
 })
 ```
 
-#### `switchNetwork(network)` *(deprecated)*
+#### `switchNetwork(network)` _(deprecated)_
 
-> **Deprecated**: Mainnet and testnet are now separate extension builds. Install the testnet extension for testnet usage. This method is retained for backward compatibility but has no effect.
+> **Deprecated**: The published extension contains a global Mainnet/Testnet Mode. Change it in
+> Noir Wallet settings; the extension locks and restarts before the target mode becomes active.
+> dApps cannot change the global mode.
 
 ### Utility Functions
 
@@ -521,9 +577,9 @@ interface MaxTransferEstimate {
 
 interface TransactionHistoryEntry {
   txid: string
-  type: string      // 'send' | 'receive' | 'shield' | 'swap' | 'lending_supply' | 'lending_withdraw' | 'lending_claim'
-  amount: string    // ZEC amount
-  status: string    // 'mined' | 'pending' | 'failed'
+  type: string // 'send' | 'receive' | 'shield' | 'swap' | 'lending_supply' | 'lending_withdraw' | 'lending_claim'
+  amount: string // ZEC amount
+  status: string // 'mined' | 'pending' | 'failed'
   timestamp: number // Unix ms
   memo?: string
 }

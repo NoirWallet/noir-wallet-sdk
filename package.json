@@ -15,16 +15,26 @@
       "types": "./dist/chains/zcash/index.d.ts",
       "import": "./dist/chains/zcash/index.mjs",
       "require": "./dist/chains/zcash/index.js"
+    },
+    "./chains/evm": {
+      "types": "./dist/chains/evm/index.d.ts",
+      "import": "./dist/chains/evm/index.mjs",
+      "require": "./dist/chains/evm/index.js"
+    },
+    "./chains/bitcoin": {
+      "types": "./dist/chains/bitcoin/index.d.ts",
+      "import": "./dist/chains/bitcoin/index.mjs",
+      "require": "./dist/chains/bitcoin/index.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --clean",
-    "dev": "tsup src/index.ts src/chains/zcash/index.ts --format cjs,esm --dts --out-dir dist --watch",
+    "build": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts --format cjs,esm --dts --out-dir dist --clean",
+    "dev": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts --format cjs,esm --dts --out-dir dist --watch",
     "type-check": "tsc --noEmit",
-    "pack:dry": "npm pack --dry-run",
+    "pack:dry": "npm pack --dry-run --ignore-scripts",
     "example:dev": "pnpm --filter @noir-wallet/example dev",
     "example:build": "pnpm --filter @noir-wallet/example build",
     "prepare": "husky || true"
@@ -61,10 +71,5 @@
     "bs58": "^6.0.0"
   },
   "private": false,
-  "packageManager": "pnpm@10.33.4",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  }
+  "packageManager": "pnpm@10.33.4"
 }
