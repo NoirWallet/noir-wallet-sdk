@@ -19,8 +19,10 @@ import {
   BitcoinExample,
   EvmExample,
   ProviderSwitcher,
+  type ExampleNavigationProps,
   type ExampleProviderId
 } from './ProviderExamples'
+import { EVM_NETWORK_EXAMPLES, getEvmNetworkExamples } from './evm-network-catalog'
 import './App.css'
 
 type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch' | 'history'
@@ -233,6 +235,22 @@ function TxRow({
 
 function App() {
   const [activeProvider, setActiveProvider] = useState<ExampleProviderId>('zcash')
+  const [exampleNetworkMode, setExampleNetworkMode] = useState<'mainnet' | 'testnet'>('mainnet')
+  const [selectedEvmNetwork, setSelectedEvmNetwork] = useState(EVM_NETWORK_EXAMPLES[0])
+  const handleExampleNetworkModeChange = (mode: 'mainnet' | 'testnet') => {
+    setExampleNetworkMode(mode)
+    setSelectedEvmNetwork(current =>
+      current.mode === mode ? current : (getEvmNetworkExamples(mode)[0] ?? current)
+    )
+  }
+  const exampleNavigation: ExampleNavigationProps = {
+    active: activeProvider,
+    onChange: setActiveProvider,
+    networkMode: exampleNetworkMode,
+    onNetworkModeChange: handleExampleNetworkModeChange,
+    selectedEvmNetwork,
+    onSelectEvmNetwork: setSelectedEvmNetwork
+  }
   const [noirWallet, setNoirWallet] = useState(() => getNoirWallet())
   const isInstalled = !!noirWallet
 
@@ -689,10 +707,10 @@ function App() {
   ]
 
   if (activeProvider === 'evm') {
-    return <EvmExample active={activeProvider} onChange={setActiveProvider} />
+    return <EvmExample navigation={exampleNavigation} />
   }
   if (activeProvider === 'bitcoin') {
-    return <BitcoinExample active={activeProvider} onChange={setActiveProvider} />
+    return <BitcoinExample navigation={exampleNavigation} />
   }
 
   return (
@@ -711,7 +729,7 @@ function App() {
                 <span className="logo-wallet">Wallet</span>
               </span>
             </a>
-            <span className="logo-badge">SDK Example</span>
+            <span className="logo-badge">SDK Example V2</span>
           </div>
           <div className="header-status">
             {!isInstalled && <span className="status-badge unavailable">Not detected</span>}
@@ -727,18 +745,10 @@ function App() {
         <section className="page-intro">
           <div>
             <p className="eyebrow">Noir Wallet developer tools</p>
-            <h1>Multichain provider playground</h1>
-            <p className="page-intro-copy">
-              Connect a real wallet, exercise provider methods, and inspect responses in one place.
-            </p>
-          </div>
-          <div className="capability-list" aria-label="Supported capabilities">
-            <span>Real MV3 provider</span>
-            <span>Typed SDK</span>
-            <span>Testnet ready</span>
+            <h1>Multichain SDK Playground</h1>
           </div>
         </section>
-        <ProviderSwitcher active={activeProvider} onChange={setActiveProvider} />
+        <ProviderSwitcher {...exampleNavigation} />
         {error && <div className="message error">{error}</div>}
 
         {!isInstalled && (
@@ -1472,7 +1482,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Noir Wallet SDK Example</p>
+        <p>Noir Wallet SDK Example V2</p>
       </footer>
     </div>
   )

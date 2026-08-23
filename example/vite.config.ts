@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 
-const base = process.env.GITHUB_PAGES ? '/noir-wallet-sdk/' : '/example/'
+const base =
+  process.env.GITHUB_PAGES_BASE ?? (process.env.GITHUB_PAGES ? '/noir-wallet-sdk/' : '/example/')
 
 export default defineConfig({
   base,

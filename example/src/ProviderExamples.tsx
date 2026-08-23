@@ -1,63 +1,156 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
+  addEvmNetwork,
   detectBitcoinProvider,
   detectEvmProvider,
   getNoirWallet,
+  switchEvmChain,
   type BitcoinBalance,
+  type BitcoinChainInfo,
+  type BitcoinNetwork,
   type BitcoinProvider,
   type EvmProvider
 } from '@noir-wallet/sdk'
+import { encodeFunctionData, isAddress } from 'viem'
+import testContractDeployments from './evm-test-contracts.json'
+import {
+  getEvmNetworkExamples,
+  getExampleChainIconUrl,
+  type EvmNetworkExample
+} from './evm-network-catalog'
+
+const NOIR_TEST_BENCH_ABI = [
+  {
+    type: 'function',
+    name: 'setValue',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'nextValue', type: 'uint256' }],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'increment',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'deposit',
+    stateMutability: 'payable',
+    inputs: [],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'alwaysRevert',
+    stateMutability: 'pure',
+    inputs: [],
+    outputs: []
+  }
+] as const
+
+const TEST_BENCH_DEPLOYMENTS = testContractDeployments as Readonly<
+  Record<string, { readonly NoirTestBench?: string }>
+>
 
 export type ExampleProviderId = 'zcash' | 'evm' | 'bitcoin'
 
-interface ProviderSwitcherProps {
+export interface ExampleNavigationProps {
   active: ExampleProviderId
   onChange: (provider: ExampleProviderId) => void
+  networkMode: EvmNetworkExample['mode']
+  onNetworkModeChange: (mode: EvmNetworkExample['mode']) => void
+  selectedEvmNetwork: EvmNetworkExample
+  onSelectEvmNetwork: (network: EvmNetworkExample) => void
 }
 
-export function ProviderSwitcher({ active, onChange }: ProviderSwitcherProps) {
-  const options: ReadonlyArray<{
-    id: ExampleProviderId
-    label: string
-    description: string
-    symbol: string
-  }> = [
-    { id: 'zcash', label: 'Zcash', description: 'Private payments', symbol: 'Z' },
-    { id: 'evm', label: 'EVM', description: 'EIP-1193', symbol: 'E' },
-    { id: 'bitcoin', label: 'Bitcoin', description: 'BIP-322 & PSBT', symbol: '₿' }
+export function ProviderSwitcher({
+  active,
+  onChange,
+  networkMode,
+  onNetworkModeChange,
+  selectedEvmNetwork,
+  onSelectEvmNetwork
+}: ExampleNavigationProps) {
+  const options = [
+    {
+      id: 'zcash' as const,
+      label: 'Zcash',
+      iconUrl: getExampleChainIconUrl('zcash.svg')
+    },
+    ...getEvmNetworkExamples(networkMode).map(network => ({
+      id: 'evm' as const,
+      label: network.label,
+      iconUrl: network.iconUrl,
+      network
+    })),
+    { id: 'bitcoin' as const, label: 'Bitcoin', iconUrl: getExampleChainIconUrl('bitcoin.svg') }
   ]
   return (
-    <nav className="provider-switcher" aria-label="Provider examples">
-      {options.map(option => (
-        <button
-          key={option.id}
-          type="button"
-          className={`provider-switcher-button ${active === option.id ? 'active' : ''}`}
-          aria-label={option.label}
-          aria-pressed={active === option.id}
-          onClick={() => onChange(option.id)}
-        >
-          <span className={`provider-symbol provider-symbol-${option.id}`}>{option.symbol}</span>
-          <span className="provider-option-copy">
-            <strong>{option.label}</strong>
-            <small>{option.description}</small>
-          </span>
-          <span className="provider-option-check" aria-hidden="true">
-            ✓
-          </span>
-        </button>
-      ))}
+    <nav className="provider-network-nav" aria-label="Provider examples">
+      <div className="provider-network-nav-heading">
+        <div>
+          <span className="section-kicker">Provider examples</span>
+          <h2>Networks</h2>
+        </div>
+        <div className="network-mode-tabs" aria-label="Example network mode">
+          {(['mainnet', 'testnet'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              className={networkMode === mode ? 'active' : ''}
+              aria-pressed={networkMode === mode}
+              onClick={() => onNetworkModeChange(mode)}
+            >
+              {mode === 'mainnet' ? 'Mainnet' : 'Testnet'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="provider-network-grid">
+        {options.map(option => {
+          const selected =
+            active === option.id && (option.id !== 'evm' || option.network === selectedEvmNetwork)
+          return (
+            <button
+              key={option.id === 'evm' ? option.network.request.chainId : option.id}
+              type="button"
+              className={`provider-network-button ${selected ? 'active' : ''}`}
+              aria-label={option.label}
+              aria-pressed={selected}
+              onClick={() => {
+                if (option.id === 'evm') onSelectEvmNetwork(option.network)
+                onChange(option.id)
+              }}
+            >
+              <span className="provider-network-icon-frame">
+                <span aria-hidden="true">{option.label.slice(0, 1)}</span>
+                <img
+                  src={option.iconUrl}
+                  alt=""
+                  crossOrigin="anonymous"
+                  onError={event => {
+                    event.currentTarget.hidden = true
+                  }}
+                />
+              </span>
+              <span>{option.label}</span>
+            </button>
+          )
+        })}
+      </div>
     </nav>
   )
 }
 
 function ExampleLayout({
-  active,
-  onChange,
+  navigation,
   available,
   connected,
   children
-}: ProviderSwitcherProps & {
+}: {
+  navigation: ExampleNavigationProps
   available: boolean
   connected: boolean
   children: ReactNode
@@ -85,7 +178,7 @@ function ExampleLayout({
                 <span className="logo-wallet">Wallet</span>
               </span>
             </a>
-            <span className="logo-badge">SDK Example</span>
+            <span className="logo-badge">SDK Example V2</span>
           </div>
           <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
         </div>
@@ -94,22 +187,14 @@ function ExampleLayout({
         <section className="page-intro">
           <div>
             <p className="eyebrow">Noir Wallet developer tools</p>
-            <h1>Multichain provider playground</h1>
-            <p className="page-intro-copy">
-              Connect a real wallet, exercise provider methods, and inspect responses in one place.
-            </p>
-          </div>
-          <div className="capability-list" aria-label="Supported capabilities">
-            <span>Real MV3 provider</span>
-            <span>Typed SDK</span>
-            <span>Testnet ready</span>
+            <h1>Multichain SDK Playground</h1>
           </div>
         </section>
-        <ProviderSwitcher active={active} onChange={onChange} />
+        <ProviderSwitcher {...navigation} />
         {children}
       </main>
       <footer className="footer">
-        <p>Noir Wallet SDK Example</p>
+        <p>Noir Wallet SDK Example V2</p>
       </footer>
     </div>
   )
@@ -154,7 +239,7 @@ function Result({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
+export function EvmExample({ navigation }: { navigation: ExampleNavigationProps }) {
   const [provider, setProvider] = useState<EvmProvider | null>(
     () => getNoirWallet()?.ethereum ?? null
   )
@@ -164,7 +249,9 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('Hello Noir Wallet')
-  const [switchChainId, setSwitchChainId] = useState('')
+  const [contractAddress, setContractAddress] = useState('')
+  const [contractValue, setContractValue] = useState('42')
+  const [contractDeposit, setContractDeposit] = useState('0.0001')
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -188,7 +275,10 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
     const nextAccount = accounts[0] ?? ''
     setChainId(nextChainId)
     setAccount(nextAccount)
-    setSwitchChainId(value => value || nextChainId)
+    setContractAddress(value => {
+      const preset = TEST_BENCH_DEPLOYMENTS[BigInt(nextChainId).toString()]?.NoirTestBench
+      return preset ?? value
+    })
     setBalance(
       nextAccount
         ? formatEther(
@@ -235,6 +325,19 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
       setBusy(false)
     }
   }
+
+  const lastAutomaticSwitch = useRef('')
+  useEffect(() => {
+    const targetChainId = navigation.selectedEvmNetwork.request.chainId
+    if (!provider || !account || !chainId || chainId === targetChainId) return
+    const attemptKey = `${account}:${chainId}:${targetChainId}`
+    if (lastAutomaticSwitch.current === attemptKey) return
+    lastAutomaticSwitch.current = attemptKey
+    void run(async () => {
+      await switchEvmChain(provider, targetChainId)
+      return `Switched to ${navigation.selectedEvmNetwork.label}`
+    })
+  }, [account, chainId, navigation.selectedEvmNetwork, provider])
 
   const connect = () =>
     run(async () => {
@@ -307,25 +410,40 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
       return `Typed-data signature: ${signature}`
     })
 
-  const switchNetwork = () =>
+  const addSelectedNetwork = () =>
     run(async () => {
-      if (!provider || !/^0x[0-9a-f]+$/i.test(switchChainId)) {
-        throw new Error('Enter a hexadecimal EVM chain ID.')
-      }
-      await provider.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: switchChainId.toLowerCase() }]
+      if (!provider) throw new Error('Connect an EVM account first.')
+      await addEvmNetwork(provider, navigation.selectedEvmNetwork.request)
+      return `${navigation.selectedEvmNetwork.label} is already available in Noir Wallet.`
+    })
+
+  const callTestBench = (functionName: 'increment' | 'setValue' | 'deposit' | 'alwaysRevert') =>
+    run(async () => {
+      if (!provider || !account) throw new Error('Connect an EVM account first.')
+      const target = contractAddress.trim()
+      if (!isAddress(target)) throw new Error('Enter a valid NoirTestBench contract address.')
+      if (!/^\d+$/.test(contractValue)) throw new Error('Test value must be an unsigned integer.')
+      const data = encodeFunctionData({
+        abi: NOIR_TEST_BENCH_ABI,
+        functionName,
+        ...(functionName === 'setValue' ? { args: [BigInt(contractValue)] } : {})
       })
-      return `Switched to ${switchChainId.toLowerCase()}`
+      const transactionHash = await provider.request<string>({
+        method: 'eth_sendTransaction',
+        params: [
+          {
+            from: account,
+            to: target,
+            value: functionName === 'deposit' ? parseEther(contractDeposit) : '0x0',
+            data
+          }
+        ]
+      })
+      return `${functionName} transaction: ${transactionHash}`
     })
 
   return (
-    <ExampleLayout
-      active={active}
-      onChange={onChange}
-      available={provider !== null}
-      connected={account !== ''}
-    >
+    <ExampleLayout navigation={navigation} available={provider !== null} connected={account !== ''}>
       {!provider && <div className="message warning">EVM provider is not enabled.</div>}
       <section className="provider-summary card">
         <div className="provider-summary-copy">
@@ -362,25 +480,21 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
             label="Native balance"
             value={balance ? `${balance} native units` : 'Unavailable'}
           />
-          <div className="form-group">
-            <label className="label" htmlFor="evm-chain-id">
-              Switch built-in chain
-            </label>
-            <input
-              id="evm-chain-id"
-              className="input input-sm"
-              value={switchChainId}
-              onChange={event => setSwitchChainId(event.target.value)}
-              placeholder="0x1"
-            />
-          </div>
-          <button
-            className="btn btn-secondary btn-full"
-            onClick={() => void switchNetwork()}
-            disabled={!account || busy}
-          >
-            Switch chain
-          </button>
+          <details className="network-method-example">
+            <summary>EIP-3085 add-network example</summary>
+            <p>
+              Noir Wallet accepts released built-in chains here. Custom EVM networks stay disabled
+              in this release.
+            </p>
+            <button
+              type="button"
+              className="btn btn-secondary btn-full"
+              onClick={() => void addSelectedNetwork()}
+              disabled={!account || busy}
+            >
+              Add {navigation.selectedEvmNetwork.label}
+            </button>
+          </details>
         </section>
         <section className="card card-compact">
           <h2>Send native asset</h2>
@@ -412,6 +526,85 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
               Send transaction
             </button>
           </form>
+        </section>
+        <section className="card card-compact grid-span-2">
+          <h2>Smart contract testing</h2>
+          <p className="card-hint">
+            Exercises arbitrary calldata, payable value, simulation rejection, approval, signing,
+            broadcast, and Activity through the real EIP-1193 provider.
+          </p>
+          <div className="form-stack">
+            <label className="label" htmlFor="evm-contract-address">
+              NoirTestBench address
+            </label>
+            <input
+              id="evm-contract-address"
+              className="input input-sm"
+              value={contractAddress}
+              onChange={event => setContractAddress(event.target.value)}
+              placeholder="0x…"
+            />
+            <div className="contract-fields">
+              <div className="form-group">
+                <label className="label" htmlFor="evm-contract-value">
+                  setValue argument
+                </label>
+                <input
+                  id="evm-contract-value"
+                  className="input input-sm"
+                  value={contractValue}
+                  onChange={event => setContractValue(event.target.value)}
+                  inputMode="numeric"
+                />
+              </div>
+              <div className="form-group">
+                <label className="label" htmlFor="evm-contract-deposit">
+                  Deposit amount
+                </label>
+                <input
+                  id="evm-contract-deposit"
+                  className="input input-sm"
+                  value={contractDeposit}
+                  onChange={event => setContractDeposit(event.target.value)}
+                  inputMode="decimal"
+                />
+              </div>
+            </div>
+            <div className="contract-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void callTestBench('increment')}
+                disabled={!account || busy}
+              >
+                Increment
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void callTestBench('setValue')}
+                disabled={!account || busy}
+              >
+                Set value
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void callTestBench('deposit')}
+                disabled={!account || busy}
+              >
+                Payable deposit
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void callTestBench('alwaysRevert')}
+                disabled={!account || busy}
+              >
+                Verify revert block
+              </button>
+            </div>
+          </div>
         </section>
         <section className="card card-compact grid-span-2">
           <h2>Sign messages</h2>
@@ -449,11 +642,12 @@ export function EvmExample({ active, onChange }: ProviderSwitcherProps) {
   )
 }
 
-export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
+export function BitcoinExample({ navigation }: { navigation: ExampleNavigationProps }) {
   const [provider, setProvider] = useState<BitcoinProvider | null>(
     () => getNoirWallet()?.bitcoin ?? null
   )
-  const [network, setNetwork] = useState('')
+  const [network, setNetwork] = useState<BitcoinNetwork | ''>('')
+  const [chain, setChain] = useState<BitcoinChainInfo | null>(null)
   const [account, setAccount] = useState('')
   const [publicKey, setPublicKey] = useState('')
   const [balance, setBalance] = useState<BitcoinBalance | null>(null)
@@ -477,9 +671,14 @@ export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
   }, [provider])
 
   const refresh = useCallback(async (current: BitcoinProvider) => {
-    const [nextNetwork, accounts] = await Promise.all([current.getNetwork(), current.getAccounts()])
+    const [nextNetwork, nextChain, accounts] = await Promise.all([
+      current.getNetwork(),
+      current.getChain(),
+      current.getAccounts()
+    ])
     const nextAccount = accounts[0] ?? ''
     setNetwork(nextNetwork)
+    setChain(nextChain)
     setAccount(nextAccount)
     if (!nextAccount) {
       setPublicKey('')
@@ -536,6 +735,20 @@ export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
       return 'Bitcoin permission revoked.'
     })
 
+  const validateNetwork = () =>
+    run(async () => {
+      if (!provider || !network) throw new Error('Connect a Bitcoin account first.')
+      await provider.switchNetwork(network)
+      return `${network} matches Noir Wallet global mode.`
+    })
+
+  const validateChain = () =>
+    run(async () => {
+      if (!provider || !chain) throw new Error('Connect a Bitcoin account first.')
+      await provider.switchChain({ enum: chain.enum })
+      return `${chain.name} matches Noir Wallet global mode.`
+    })
+
   const sendBitcoin = (event: FormEvent) => {
     event.preventDefault()
     void run(async () => {
@@ -566,12 +779,7 @@ export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
     })
 
   return (
-    <ExampleLayout
-      active={active}
-      onChange={onChange}
-      available={provider !== null}
-      connected={account !== ''}
-    >
+    <ExampleLayout navigation={navigation} available={provider !== null} connected={account !== ''}>
       {!provider && <div className="message warning">Bitcoin provider is not enabled.</div>}
       <section className="provider-summary card">
         <div className="provider-summary-copy">
@@ -603,6 +811,7 @@ export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
         <section className="card card-compact">
           <h2>Account &amp; network</h2>
           <Result label="Network" value={network || 'Unavailable'} />
+          <Result label="Chain" value={chain?.name ?? 'Unavailable'} />
           <Result label="Address" value={account || 'Not connected'} />
           <Result label="Public key" value={publicKey || 'Unavailable'} />
           <Result
@@ -611,6 +820,28 @@ export function BitcoinExample({ active, onChange }: ProviderSwitcherProps) {
               balance ? `${balance.total} sats (${balance.unconfirmed} unconfirmed)` : 'Unavailable'
             }
           />
+          <div className="button-row compact-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void validateNetwork()}
+              disabled={!account || busy}
+            >
+              Validate network
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void validateChain()}
+              disabled={!account || busy}
+            >
+              Validate chain
+            </button>
+          </div>
+          <p className="field-help">
+            These compatibility methods validate the active mode. Change Mainnet/Testnet Mode in
+            Noir Wallet settings.
+          </p>
         </section>
         <section className="card card-compact">
           <h2>Send Bitcoin</h2>

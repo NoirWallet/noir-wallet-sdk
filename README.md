@@ -122,11 +122,20 @@ Use the SDK discovery helper instead of assuming Noir Wallet owns `window.ethere
 the integration correct when several EVM wallets are installed.
 
 ```typescript
-import { detectEvmProvider } from '@noir-wallet/sdk'
+import { addEvmNetwork, detectEvmProvider, switchEvmChain } from '@noir-wallet/sdk'
 
 const ethereum = await detectEvmProvider()
 const [address] = await ethereum.request<string[]>({ method: 'eth_requestAccounts' })
 const chainId = await ethereum.request<string>({ method: 'eth_chainId' })
+
+await addEvmNetwork(ethereum, {
+  chainId: '0x2105',
+  chainName: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: ['https://mainnet.base.org'],
+  blockExplorerUrls: ['https://base.blockscout.com']
+})
+await switchEvmChain(ethereum, '0x2105')
 
 const signature = await ethereum.request<string>({
   method: 'personal_sign',
@@ -141,8 +150,10 @@ const transactionHash = await ethereum.request<string>({
 console.log({ chainId, signature, transactionHash })
 ```
 
-`wallet_switchEthereumChain` switches only among EVM networks released for the active global
-Mainnet/Testnet Mode. Changing the global mode is a wallet setting and restarts the extension.
+`addEvmNetwork()` sends the standard `wallet_addEthereumChain` request, but this release accepts
+released built-in chains only. `switchEvmChain()` switches only among EVM networks released for the
+active global Mainnet/Testnet Mode. Changing the global mode is a wallet setting and restarts the
+extension.
 
 ### Bitcoin
 

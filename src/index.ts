@@ -1,5 +1,11 @@
 export { getNoirWallet, isNoirWalletInstalled } from './provider'
-export { detectEvmProvider, getEvmProvider } from './chains/evm'
+export {
+  addEvmNetwork,
+  detectEvmProvider,
+  getEvmChainId,
+  getEvmProvider,
+  switchEvmChain
+} from './chains/evm'
 export { detectBitcoinProvider, getBitcoinProvider } from './chains/bitcoin'
 
 export type {
@@ -11,8 +17,10 @@ export type {
 
 export type {
   DetectEvmProviderOptions,
+  AddEvmNetworkParameters,
   Eip6963ProviderDetail,
   Eip6963ProviderInfo,
+  EvmChainId,
   EvmProvider,
   EvmProviderListener,
   EvmRequestArguments

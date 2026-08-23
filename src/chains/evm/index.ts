@@ -1,4 +1,5 @@
 export { detectEvmProvider, getEvmProvider } from './provider'
+export { addEvmNetwork, getEvmChainId, switchEvmChain } from './network'
 export type {
   DetectEvmProviderOptions,
   Eip6963ProviderDetail,
@@ -7,3 +8,4 @@ export type {
   EvmProviderListener,
   EvmRequestArguments
 } from './types'
+export type { AddEvmNetworkParameters, EvmChainId } from './network'

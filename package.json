@@ -34,14 +34,21 @@
     "build": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts --format cjs,esm --dts --out-dir dist --clean",
     "dev": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts --format cjs,esm --dts --out-dir dist --watch",
     "type-check": "tsc --noEmit",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
+    "test:network": "pnpm run build && node --test tests/evm-network.test.mjs",
     "pack:dry": "npm pack --dry-run --ignore-scripts",
     "example:dev": "pnpm --filter @noir-wallet/example dev",
     "example:build": "pnpm --filter @noir-wallet/example build",
+    "contracts:compile": "node contracts/compile.mjs",
+    "contracts:deploy": "node contracts/deploy.mjs",
+    "contracts:verify": "node contracts/verify-calls.mjs",
     "prepare": "husky || true"
   },
   "devDependencies": {
+    "solc": "^0.8.36",
     "tsup": "^8.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "viem": "^2.55.19"
   },
   "keywords": [
     "noir",
