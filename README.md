@@ -1,637 +1,315 @@
 # Noir Wallet SDK
 
-> **For regular use**, install Noir Wallet from the [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn).
-> Preview builds for testing are available on the [Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) page.
+Typed TypeScript SDK for connecting web apps to the Noir Wallet browser extension.
 
-TypeScript SDK and example dApp for integrating with Noir Wallet.
+- [Integration guide](https://docs.zknoir.com/developers)
+- [Provider API reference](https://docs.zknoir.com/developers/provider-api)
+- [Example dApp](https://github.com/NoirWallet/noir-wallet-sdk/tree/main/example)
+- [Install Noir Wallet for mainnet](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn)
+- [Download the testnet build](https://github.com/NoirWallet/noir-wallet-sdk/releases)
 
-## Install
+## What the SDK does
+
+`@noir-wallet/sdk` wraps the provider injected at `window.noirwallet` and gives your app a typed Zcash API. Use it to:
+
+- request access to one or more wallet accounts;
+- read addresses, balances, and transaction history;
+- estimate the exact maximum transfer and send ZEC;
+- shield transparent funds;
+- sign and verify messages;
+- react to account changes.
+
+The SDK is browser-only. It does not create or custody wallets, and Noir Wallet must be installed for provider calls to work.
+
+## Install an extension build
+
+Mainnet and testnet are separate Noir Wallet extensions:
+
+| Network | Download | Use |
+| --- | --- | --- |
+| Mainnet | [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn) | Production apps and real ZEC |
+| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) | Development and test ZEC |
+
+To install testnet:
+
+1. Open the official Releases page and choose the release you want to test.
+2. Download the asset whose filename ends with `-testnet.zip`.
+3. Unzip the downloaded file.
+4. Open `chrome://extensions`, enable **Developer mode**, and select **Load unpacked**.
+5. Choose the extracted extension directory and confirm the installed name is **[Testnet] Noir Wallet**.
+
+Only install testnet ZIP files published by the `NoirWallet/noir-wallet-sdk` repository. The mainnet asset does not contain `-testnet` in its filename.
+
+The builds use different extension IDs and isolated wallet data. The SDK does not switch networks at runtime; `switchNetwork()` is deprecated and always throws.
+
+## Install the SDK
+
+```bash
+pnpm add @noir-wallet/sdk
+npm install @noir-wallet/sdk
+```
+
+## Quick start
+
+There are two different connection calls:
+
+- `getAccounts()` checks an existing authorization silently and returns `null` when the current site is not connected.
+- `connect()` opens Noir Wallet so the user can approve access. Call it from an intentional user action such as a button click.
+
+```ts
+import { getNoirWallet } from '@noir-wallet/sdk'
+
+const wallet = getNoirWallet()
+
+if (!wallet) {
+  throw new Error('Install Noir Wallet to continue')
+}
+
+const { zcash } = wallet
+
+// Safe to call during page initialization: this never requests approval.
+const existingConnection = await zcash.getAccounts()
+if (existingConnection) {
+  console.log('Already connected:', existingConnection.accounts)
+}
+
+// Call this from your Connect button.
+async function connectWallet() {
+  const connection = await zcash.connect()
+
+  console.log('Primary shielded address:', connection.shielded)
+  console.log('Authorized accounts:', connection.accounts)
+
+  const balance = await zcash.getBalance()
+  console.log('Total ZEC:', balance.total)
+  console.log('Spendable estimate:', balance.available)
+}
+```
+
+`getNoirWallet()` returns `null` during server-side rendering and when the extension is unavailable. Resolve it in browser code, not at module initialization in an SSR application.
+
+The examples below use the `zcash` instance created in the quick start.
+
+## Core concepts
+
+### Primary and authorized accounts
+
+`connect()` and `getAccounts()` return the primary account at the top level for simple integrations:
+
+```ts
+const connection = await zcash.connect()
+
+console.log(connection.transparent)
+console.log(connection.shielded)
+```
+
+They also return every account the user authorized:
+
+```ts
+for (const account of connection.accounts) {
+  console.log(account.id, account.label)
+  console.log(account.addresses.transparent)
+  console.log(account.addresses.shielded)
+}
+```
+
+Use an account `id` when you need a specific authorized account's balance:
+
+```ts
+const allBalances = await zcash.getBalance()
+
+for (const account of allBalances.accounts) {
+  console.log(account.id, account.balance.total, account.synced)
+}
+
+const selected = connection.accounts[1]
+if (selected) {
+  const selectedBalance = await zcash.getBalance(selected.id)
+  console.log(selectedBalance.total)
+}
+```
+
+`synced: false` means the value is cached or unavailable because that account is locked or has not finished syncing.
+
+### Amounts and available balance
+
+Amounts are decimal ZEC strings. Keep them as strings instead of converting them to JavaScript floating-point numbers.
+
+`getBalance().available` is a destination-agnostic estimate. It cannot account for the final recipient, memo, fee tier, or transaction action count. Use `getMaxTransfer()` when you need an exact Max value.
+
+## Send ZEC
+
+Use `to`, not `address` or `recipient`, for the destination.
+
+```ts
+const txid = await zcash.sendTransaction({
+  to: 'u1...',
+  amount: '0.25',
+  memo: 'Invoice 1042',
+  fundingSource: 'shielded'
+})
+
+console.log('Broadcast transaction:', txid)
+```
+
+The wallet opens an approval screen before sending. A memo is supported only for shielded recipients and is limited to 512 UTF-8 bytes.
+
+### Send the exact maximum
+
+The estimate and transaction must use the same destination, memo, and funding source:
+
+```ts
+import type { MaxTransferParams } from '@noir-wallet/sdk'
+
+const transfer = {
+  to: 'u1...',
+  memo: 'Withdraw remaining balance',
+  feeTier: 'standard',
+  fundingSource: 'shielded'
+} satisfies MaxTransferParams
+
+const estimate = await zcash.getMaxTransfer(transfer)
+
+console.log('Maximum payment:', estimate.maxAmount)
+console.log('Transaction fee:', estimate.fee)
+
+const txid = await zcash.sendTransaction({
+  to: transfer.to,
+  amount: estimate.maxAmount,
+  memo: transfer.memo,
+  fundingSource: transfer.fundingSource
+})
+```
+
+The approval screen controls the final transaction fee. If the user chooses a fee tier different from the estimate, recalculate Max before sending.
+
+Transparent funding can reveal and link selected UTXOs. It is not supported by Keystone accounts.
+
+## Sign and verify a message
+
+`derived` mode creates a privacy-preserving identity key that is unlinkable to the main transparent address. It is the recommended mode for off-chain identity binding.
+
+```ts
+import { verifyMessageSignature } from '@noir-wallet/sdk'
+
+const message = 'Sign in to Example'
+const signed = await zcash.signMessage(message, {
+  signingMode: 'derived'
+})
+
+const verification = verifyMessageSignature({
+  message,
+  signature: signed.signature,
+  pubkey: signed.pubkey,
+  address: signed.address,
+  network: 'mainnet'
+})
+
+if (!verification.valid) {
+  throw new Error(verification.error ?? 'Invalid signature')
+}
+```
+
+Available signing modes are `current`, `derived`, and `legacy_index0`. See the [Provider API reference](https://docs.zknoir.com/developers/provider-api) before choosing a compatibility mode.
+
+## Listen for account changes
+
+Refresh account-scoped state after `accountsChanged`. Remove the listener when your component or integration is disposed.
+
+```ts
+async function refreshWalletState() {
+  const connection = await zcash.getAccounts()
+
+  if (!connection) {
+    // The site is disconnected or the selected account is unavailable.
+    return
+  }
+
+  const balance = await zcash.getBalance()
+  console.log(connection.accounts, balance.accounts)
+}
+
+function handleAccountsChanged() {
+  void refreshWalletState()
+}
+
+zcash.on('accountsChanged', handleAccountsChanged)
+
+// During cleanup:
+zcash.removeListener('accountsChanged', handleAccountsChanged)
+```
+
+## API overview
+
+All wallet methods are available on `getNoirWallet().zcash`.
+
+| Method                           | Approval | Purpose                                                 |
+| -------------------------------- | -------: | ------------------------------------------------------- |
+| `connect()`                      |      Yes | Request access to one or more accounts                  |
+| `getAccounts()`                  |       No | Read the current authorization, or `null`               |
+| `disconnect()`                   |       No | Remove this site's wallet authorization                 |
+| `getAddresses()`                 |       No | Read the primary transparent and shielded addresses     |
+| `getBalance(accountId?)`         |       No | Read primary, selected, and authorized-account balances |
+| `getMaxTransfer(params)`         |       No | Calculate the exact Max amount and fee                  |
+| `sendTransaction(params)`        |      Yes | Approve and broadcast a Zcash transaction               |
+| `shieldFunds()`                  |      Yes | Move transparent funds into the shielded balance        |
+| `getTransactionHistory()`        |       No | Read on-chain and locally pending transactions          |
+| `getPublicKey(options?)`         |       No | Read the public identity key for a signing mode         |
+| `signMessage(message, options?)` |      Yes | Approve and sign a message                              |
+| `checkLendingMcaAccount()`       |       No | Read lending MCA and signing-mode status                |
+| `on(event, handler)`             |       No | Subscribe to provider events                            |
+| `removeListener(event, handler)` |       No | Unsubscribe from provider events                        |
+
+`switchNetwork()` is deprecated and always throws. Mainnet and testnet are separate extension builds; install the appropriate extension instead of switching at runtime.
+
+The package also exports lower-level helpers such as `detectProvider()`, `getZcashProvider()`, `publicKeyToAddress()`, and `verifyMessageSignature()`. Most applications should start with `getNoirWallet()`.
+
+## Handle errors
+
+Provider calls can fail when the user rejects a request, the wallet is locked, the account is no longer authorized, a parameter is invalid, or a transaction cannot be built.
+
+```ts
+try {
+  await zcash.sendTransaction({
+    to: 'u1...',
+    amount: '0.25'
+  })
+} catch (error) {
+  const message = error instanceof Error ? error.message : 'Wallet request failed'
+  console.error(message)
+}
+```
+
+Do not treat `getAccounts() === null` as an exception; it is the normal result for a site without an active authorization.
+
+## Extension compatibility
+
+The optional `fundingSource` parameter in `getMaxTransfer()` and `sendTransaction()` requires Noir Wallet 1.0.27 or later. When omitted, it defaults to shielded funds.
+
+The SDK normalizes older single-account responses into the current `accounts` array shape, so one integration path works with both response formats.
+
+## Run the example locally
 
 ```bash
 pnpm install
-```
-
-## Build
-
-```bash
 pnpm build
 pnpm --filter @noir-wallet/example build
+pnpm example:dev
 ```
 
 ## Example
 
 The example app lives in `example/` and uses the workspace SDK package. It exposes the same
 Zcash, EVM, and Bitcoin provider flows that a dApp uses, including connection, balance queries,
-transactions, message signing, EIP-712, BIP-322, and PSBT signing:
+transactions, message signing, EIP-712, BIP-322, and PSBT signing.
 
-```bash
-pnpm example:dev
-```
+The example dApp requires Noir Wallet to be installed in the same browser.
 
-Noir Wallet must be installed in the browser for wallet connection flows.
+## Complete documentation
 
-> **Extension compatibility:** The optional `fundingSource` parameter for
-> `getMaxTransfer()` and `sendTransaction()` requires Noir Wallet extension
-> **1.0.27 or later**. When omitted, the SDK continues to use shielded funds.
+For parameter definitions, return types, privacy considerations, and provider RPC details, read:
 
-## SDK API
-
-TypeScript SDK for integrating with Noir Wallet Chrome Extension.
-
-## Installation
-
-```bash
-npm install @noir-wallet/sdk
-# or
-yarn add @noir-wallet/sdk
-# or
-pnpm add @noir-wallet/sdk
-```
-
-## Usage
-
-### Basic Example
-
-```typescript
-import { getNoirWallet } from '@noir-wallet/sdk'
-
-// Get Noir Wallet
-const noirWallet = getNoirWallet()
-if (!noirWallet) {
-  throw new Error('Noir Wallet not installed')
-}
-
-const zcash = noirWallet.zcash
-// `zcash` is a ZcashClient: the typed high-level SDK wrapper around the injected provider.
-
-// Check existing connection (silent, no popup)
-const accounts = await zcash.getAccounts()
-
-// Connect wallet if not connected (shows popup)
-if (!accounts) {
-  const newAccounts = await zcash.connect()
-  console.log('Wallet connected:', newAccounts)
-} else {
-  console.log('Already connected:', accounts)
-}
-
-// Get balance
-const balance = await zcash.getBalance()
-console.log('Transparent:', balance.transparent, 'ZEC')
-console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
-
-// Get public key
-const publicKeyInfo = await zcash.getPublicKey()
-if (publicKeyInfo) {
-  console.log('Public Key:', publicKeyInfo.pubkey)
-  console.log('Address:', publicKeyInfo.address)
-}
-
-// Use the same funding source for Max and Send
-const fundingSource = 'transparent' as const
-
-// Calculate the exact Max after the destination, memo, and source are known
-const max = await zcash.getMaxTransfer({
-  to: 'u1XYZ...',
-  memo: 'Payment for services',
-  fundingSource
-})
-
-// Send transaction with optional memo
-const txid = await zcash.sendTransaction({
-  to: 'u1XYZ...',
-  amount: max.maxAmount,
-  memo: 'Payment for services',
-  fundingSource
-})
-console.log('Transaction sent:', txid)
-
-// Sign message
-const result = await zcash.signMessage('Hello World')
-console.log('Signature:', result.signature)
-console.log('Address:', result.address)
-```
-
-`ZcashClient` is the public high-level client type. The former `ZcashAPI` export remains as a
-deprecated compatibility alias, so existing integrations can upgrade without a breaking rename.
-
-### EVM (EIP-1193 and EIP-6963)
-
-Use the SDK discovery helper instead of assuming Noir Wallet owns `window.ethereum`. This keeps
-the integration correct when several EVM wallets are installed.
-
-```typescript
-import { addEvmNetwork, detectEvmProvider, switchEvmChain } from '@noir-wallet/sdk'
-
-const ethereum = await detectEvmProvider()
-const [address] = await ethereum.request<string[]>({ method: 'eth_requestAccounts' })
-const chainId = await ethereum.request<string>({ method: 'eth_chainId' })
-
-await addEvmNetwork(ethereum, {
-  chainId: '0x2105',
-  chainName: 'Base',
-  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://mainnet.base.org'],
-  blockExplorerUrls: ['https://base.blockscout.com']
-})
-await switchEvmChain(ethereum, '0x2105')
-
-const signature = await ethereum.request<string>({
-  method: 'personal_sign',
-  params: ['0x48656c6c6f204e6f6972', address]
-})
-
-const transactionHash = await ethereum.request<string>({
-  method: 'eth_sendTransaction',
-  params: [{ from: address, to: '0x…', value: '0x38d7ea4c68000' }]
-})
-
-console.log({ chainId, signature, transactionHash })
-```
-
-`addEvmNetwork()` sends the standard `wallet_addEthereumChain` request, but this release accepts
-released built-in chains only. `switchEvmChain()` switches only among EVM networks released for the
-active global Mainnet/Testnet Mode. Changing the global mode is a wallet setting and restarts the
-extension.
-
-### Bitcoin
-
-```typescript
-import { detectBitcoinProvider } from '@noir-wallet/sdk'
-
-const bitcoin = await detectBitcoinProvider()
-const { address, publicKey } = await bitcoin.connect()
-const balance = await bitcoin.getBalance()
-
-const signature = await bitcoin.signMessage('Hello Noir Bitcoin', 'bip322-simple')
-const transactionId = await bitcoin.sendBitcoin('bc1q…', 1000)
-
-console.log({ address, publicKey, balance, signature, transactionId })
-```
-
-`signPsbt(psbtHex, { autoFinalized: false })` returns the signed PSBT as hex. Bitcoin network
-switch methods validate the active network only; global Mainnet/Testnet Mode is changed in Noir
-Wallet settings.
-
-### Detect Provider
-
-```typescript
-import { getNoirWallet, isNoirWalletInstalled } from '@noir-wallet/sdk'
-
-// Check if installed
-if (isNoirWalletInstalled()) {
-  const noirWallet = getNoirWallet()
-  console.log('Noir Wallet detected')
-} else {
-  console.error('Noir Wallet not found')
-}
-```
-
-### Event Listeners
-
-```typescript
-const noirWallet = getNoirWallet()
-const zcash = noirWallet.zcash
-
-// Connect first
-await zcash.connect()
-
-// Listen to account changes (unlock/lock, switch account)
-zcash.on('accountsChanged', async addresses => {
-  if (!addresses) {
-    console.log('Wallet locked or disconnected')
-    return
-  }
-  console.log('Primary account changed:', addresses.transparent)
-  // Multi-wallet dApps: refresh the authorized account list
-  const result = await zcash.getAccounts()
-  console.log('Authorized wallets:', result?.accounts.length)
-})
-
-// Listen to chain/network changes
-zcash.on('chainChanged', chainInfo => {
-  console.log('Network changed:', chainInfo)
-})
-```
-
-## API
-
-### Methods
-
-All methods are available on `noirWallet.zcash`:
-
-#### `connect()`
-
-Request wallet connection (shows popup if not authorized). The approval screen lets the user authorize **one or several independent wallets** in a single action (MetaMask-style: the current account is preselected, more can be added).
-
-**Returns**: `Promise<ZcashConnectResult>` — the primary account's `transparent`/`shielded` addresses **plus** an `accounts` array listing every authorized wallet.
-
-```typescript
-const result = await zcash.connect()
-
-// Primary (connected) account — same shape as before, fully backward compatible
-console.log('Transparent:', result.transparent)
-console.log('Shielded:', result.shielded)
-
-// Every authorized wallet (always contains at least the primary)
-result.accounts.forEach(acc => {
-  console.log(acc.label, acc.addresses.transparent, acc.addresses.shielded)
-})
-```
-
-#### `getAccounts()`
-
-Query existing connection silently (no popup).
-
-**Returns**: `Promise<ZcashConnectResult | null>` — same enhanced shape as `connect()`, or `null` if not connected.
-
-```typescript
-const result = await zcash.getAccounts()
-if (result) {
-  console.log('Connected:', result.transparent)
-  console.log('Authorized wallets:', result.accounts.length)
-} else {
-  console.log('Not connected')
-}
-```
-
-#### `getBalance(accountId?)`
-
-Get wallet balance.
-
-**Params** (optional):
-
-- `accountId: string` — an account `id` (the `${walletId}:${accountId}` key from `accounts`). Omit to read the primary (connected) account.
-
-**Returns**: `Promise<ZcashBalanceResult>` — the primary (or requested) account's balance fields **plus** an `accounts` array with every authorized account's balance.
-
-```typescript
-// Primary account balance (backward compatible)
-const balance = await zcash.getBalance()
-console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
-
-// Per-wallet balances
-balance.accounts.forEach(b => {
-  console.log(b.id, b.balance.shielded, b.synced ? '(synced)' : '(cached)')
-})
-
-// A specific authorized wallet
-const second = await zcash.getBalance(balance.accounts[1]?.id)
-```
-
-**Balance fields**:
-
-- `transparent`: Transparent address balance
-- `shielded`: Shielded balance (Sapling + Orchard)
-- `total`: Total balance (transparent + shielded)
-- `available`: A destination-agnostic, cached compatibility value. It does not account for the final recipient, memo, selected fee tier, or exact transaction action count. Use `getMaxTransfer()` for an exact Max value once those inputs are known.
-- `accounts`: Balance of every authorized account; each entry carries a `synced` flag (`false` = cached/zero fallback because the wallet is locked or that account hasn't synced yet).
-
-> **Multi-wallet access & compatibility:** `connect()` / `getAccounts()` / `getBalance()` are backward compatible — their original top-level fields are unchanged, and the `accounts` array is purely additive. dApps on **older extensions** that don't return `accounts` still work: the SDK normalizes the single-account response into a one-element `accounts` array, so your code path is identical regardless of extension version. To react to changes, listen for `accountsChanged` and re-call `getAccounts()` / `getBalance()` to refresh the array.
-
-#### `getMaxTransfer(params)`
-
-Calculate the exact transferable amount and proposal fee for a specific recipient, memo, and fee tier using the current connected account.
-
-**Params**:
-
-- `to: string` - Recipient address
-- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only)
-- `feeTier?: 'standard' | 'fast'` - Fee tier used for the estimate; defaults to `standard`
-- `fundingSource?: 'shielded' | 'transparent'` - Balance used for the estimate; defaults to `shielded`
-
-**Returns**: `Promise<MaxTransferEstimate>`
-
-- `maxAmount: string` - Exact payment amount in ZEC
-- `fee: string` - Fee for the exact send-max proposal in ZEC
-
-```typescript
-const params = {
-  to: 'u1XYZ...',
-  memo: 'Payment for services',
-  feeTier: 'standard' as const,
-  fundingSource: 'transparent' as const
-}
-const { maxAmount, fee } = await zcash.getMaxTransfer(params)
-
-console.log('Max:', maxAmount, 'ZEC')
-console.log('Fee:', fee, 'ZEC')
-
-const txid = await zcash.sendTransaction({
-  to: params.to,
-  amount: maxAmount,
-  memo: params.memo,
-  fundingSource: params.fundingSource
-})
-```
-
-> **Compatibility:** `fundingSource` requires Noir Wallet extension **1.0.27 or
-> later**. Omit it to retain the existing shielded-only behavior. Do not request
-> transparent funding from an older extension because it does not understand the
-> parameter. Legacy dApps can continue using `balance.available`, but it is a
-> conservative fallback rather than an exact recipient-aware Max.
-
-#### `getPublicKey(options?)`
-
-Get the public key of the transparent address.
-
-**Params** (optional):
-
-- `options.signingMode`: `'current'` (default) or `'derived'`
-
-**Returns**: `Promise<{ pubkey: string, address: string, signingMode: SigningMode, originAddress?: string } | null>`
-
-- `pubkey`: Hex-encoded public key
-- `address`: Transparent address corresponding to the key
-- `signingMode`: The actual signing mode used
-- `originAddress`: (only in `'derived'` mode) The user's main transparent address
-
-```typescript
-// Default: current transparent address key
-const publicKeyInfo = await zcash.getPublicKey()
-
-// Derived: privacy-preserving key (unlinkable to main address)
-const derivedKey = await zcash.getPublicKey({ signingMode: 'derived' })
-console.log('Derived Key:', derivedKey.pubkey)
-console.log('Main Address:', derivedKey.originAddress)
-```
-
-**Note**: This method requires the wallet to be connected but does not trigger an unlock popup. Returns `null` if the wallet is locked.
-
-#### `sendTransaction(params)`
-
-Send a transaction using shielded funds by default, or explicitly select transparent funds.
-
-**Params**:
-
-- `to: string` - Recipient address
-- `amount: string` - Amount in ZEC
-- `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only; not allowed for transparent recipients)
-- `fundingSource?: 'shielded' | 'transparent'` - Balance used to fund the transaction; defaults to `shielded`
-
-**Returns**: `Promise<string>` - Transaction ID
-
-> **Privacy:** Transparent funding reveals and may link the selected transparent
-> UTXOs on-chain. It is not supported by Keystone hardware wallets.
->
-> **Compatibility:** `fundingSource` is supported by Noir Wallet extension
-> **1.0.27 or later**.
-
-```typescript
-const txid = await zcash.sendTransaction({
-  to: 'u1XYZ...',
-  amount: '0.1',
-  memo: 'Payment for services',
-  fundingSource: 'transparent'
-})
-```
-
-#### `signMessage(message, options?)`
-
-Sign a message with a transparent address key.
-
-**Params**:
-
-- `message: string` - Message to sign
-- `options.signingMode`: `'current'` (default) or `'derived'`
-
-**Returns**: `Promise<SignMessageResult>`
-
-- `signature`: Hex-encoded ECDSA signature
-- `pubkey`: Hex-encoded public key
-- `address`: Transparent address used for signing
-- `signingMode`: The actual signing mode used
-- `originAddress`: (only in `'derived'` mode) The user's main transparent address
-
-```typescript
-// Default: sign with current transparent address key
-const result = await zcash.signMessage('Hello World')
-
-// Derived: sign with a privacy-preserving derived key
-// Recommended for identity binding (MCA, DID) to prevent on-chain asset linkage
-const derived = await zcash.signMessage('Hello World', { signingMode: 'derived' })
-console.log('Signature:', derived.signature)
-console.log('Origin Address:', derived.originAddress)
-```
-
-#### `getAddresses()`
-
-Get the connected wallet's transparent and shielded addresses.
-
-**Returns**: `Promise<ZcashAddress>` - `{ transparent, shielded }`
-
-```typescript
-const addresses = await zcash.getAddresses()
-console.log('Transparent:', addresses.transparent)
-console.log('Shielded:', addresses.shielded)
-```
-
-#### `shieldFunds()`
-
-Shield transparent funds to the private (shielded) balance. Requires user approval via popup.
-
-**Returns**: `Promise<string>` - Transaction ID
-
-```typescript
-const txid = await zcash.shieldFunds()
-console.log('Shield transaction:', txid)
-```
-
-> **Note**: This moves all transparent balance into the shielded pool for enhanced privacy. The user will see an approval popup.
-
-#### `getTransactionHistory()`
-
-Fetch transaction history from the wallet (includes on-chain and local pending transactions).
-
-**Returns**: `Promise<TransactionHistoryEntry[]>`
-
-Each entry contains:
-
-- `txid`: Transaction hash (hex)
-- `type`: `'send'` | `'receive'` | `'shield'` | `'swap'` | `'lending_supply'` | `'lending_withdraw'` | `'lending_claim'`
-- `amount`: Amount in ZEC
-- `status`: `'mined'` | `'pending'` | `'failed'`
-- `timestamp`: Unix timestamp in milliseconds
-- `memo`: Optional memo string
-
-```typescript
-const history = await zcash.getTransactionHistory()
-history.forEach(tx => {
-  console.log(`${tx.type} ${tx.amount} ZEC - ${tx.status}`)
-})
-```
-
-#### `switchNetwork(network)` _(deprecated)_
-
-> **Deprecated**: The published extension contains a global Mainnet/Testnet Mode. Change it in
-> Noir Wallet settings; the extension locks and restarts before the target mode becomes active.
-> dApps cannot change the global mode.
-
-### Utility Functions
-
-#### `publicKeyToAddress(pubkey, network)`
-
-Convert a public key to a Zcash transparent address.
-
-**Params**:
-
-- `pubkey: string` - Public key in hexadecimal format (compressed 33 bytes or uncompressed 65 bytes)
-- `network: 'mainnet' | 'testnet'` - Network type (defaults to 'mainnet')
-
-**Returns**: `string` - Zcash transparent address (P2PKH format)
-
-**Throws**: Error if public key format is invalid
-
-```typescript
-import { publicKeyToAddress } from '@noir-wallet/sdk'
-
-// Get public key from wallet
-const { pubkey } = await zcash.getPublicKey()
-
-// Convert to address for verification
-const address = publicKeyToAddress(pubkey, 'mainnet')
-console.log('Address:', address)
-
-// Convert external public key
-const externalPubkey = '03a1b2c3d4e5f6...'
-const externalAddress = publicKeyToAddress(externalPubkey, 'mainnet')
-```
-
-**Public Key Formats**:
-
-- Compressed (33 bytes): Starts with `02` or `03`
-- Uncompressed (65 bytes): Starts with `04`
-
-**Note**: This function implements the Bitcoin/Zcash P2PKH address generation algorithm (SHA256 → RIPEMD160 → Base58Check).
-
-### Events
-
-#### `accountsChanged`
-
-Triggered when accounts change (unlock/lock, switch account).
-
-**Data**: `ZcashAddress | null` - Current addresses (null if locked/disconnected)
-
-#### `chainChanged`
-
-Triggered when network changes.
-
-**Data**: `{ chainId: string, network: string }`
-
-> **Multi-wallet dApps:** there is no separate batch event. When `accountsChanged` fires, re-call `getAccounts()` (and `getBalance()`) to refresh the `accounts` array.
-
-## Types
-
-```typescript
-interface ZcashAddress {
-  transparent: string
-  shielded: string
-}
-
-interface Balance {
-  transparent: string
-  shielded: string
-  total?: string
-  available?: string // Destination-agnostic compatibility value
-}
-
-// One account from a batch (multi-wallet) authorization.
-// `id` is the stable `${walletId}:${accountId}` key; `label` is the wallet name.
-interface ZcashAccount {
-  id: string
-  label: string
-  walletId: string
-  accountId: string
-  addresses: ZcashAddress
-}
-
-// Balance for one authorized account.
-// `synced: false` means a cached/zero fallback (locked or not yet synced).
-interface ZcashAccountBalance {
-  id: string
-  walletId: string
-  accountId: string
-  balance: Balance
-  synced: boolean
-}
-
-// Result of connect() / getAccounts(): primary account fields + every authorized wallet.
-interface ZcashConnectResult extends ZcashAddress {
-  accounts: ZcashAccount[]
-}
-
-// Result of getBalance(): primary (or requested) balance + every authorized balance.
-interface ZcashBalanceResult extends Balance {
-  accounts: ZcashAccountBalance[]
-}
-
-interface SendTransactionParams {
-  to: string
-  amount: string
-  memo?: string // Private memo (max 512 bytes UTF-8)
-}
-
-type FeeTier = 'standard' | 'fast'
-
-interface MaxTransferParams {
-  to: string
-  memo?: string
-  feeTier?: FeeTier
-}
-
-interface MaxTransferEstimate {
-  maxAmount: string
-  fee: string
-}
-
-interface TransactionHistoryEntry {
-  txid: string
-  type: string // 'send' | 'receive' | 'shield' | 'swap' | 'lending_supply' | 'lending_withdraw' | 'lending_claim'
-  amount: string // ZEC amount
-  status: string // 'mined' | 'pending' | 'failed'
-  timestamp: number // Unix ms
-  memo?: string
-}
-
-type SigningMode = 'derived' | 'current'
-
-interface SignMessageOptions {
-  signingMode?: SigningMode // Default: 'current'
-}
-
-interface SignMessageResult {
-  signature: string // Hex-encoded ECDSA signature
-  pubkey: string // Hex-encoded public key
-  address: string // Transparent address used for signing
-  signingMode: SigningMode // Actual signing mode used
-  originAddress?: string // Main transparent address (only in 'derived' mode)
-}
-
-type Network = 'mainnet' | 'testnet'
-```
-
-## Error Handling
-
-```typescript
-const noirWallet = getNoirWallet()
-if (!noirWallet) {
-  console.error('Please install Noir Wallet extension')
-  return
-}
-
-try {
-  await noirWallet.zcash.connect()
-} catch (error) {
-  if (error.code === 4001) {
-    console.error('User rejected the request')
-  } else {
-    console.error('Connection failed:', error.message)
-  }
-}
-```
-
-## License
-
-MIT
+- [SDK integration guide](https://docs.zknoir.com/developers)
+- [Provider API reference](https://docs.zknoir.com/developers/provider-api)
+- [Accounts and events](https://docs.zknoir.com/developers/accounts-and-events)
+- [Integration security](https://docs.zknoir.com/developers/security)
