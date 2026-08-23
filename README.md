@@ -293,8 +293,15 @@ The SDK normalizes older single-account responses into the current `accounts` ar
 ```bash
 pnpm install
 pnpm build
+pnpm --filter @noir-wallet/example build
 pnpm example:dev
 ```
+
+## Example
+
+The example app lives in `example/` and uses the workspace SDK package. It exposes the same
+Zcash, EVM, and Bitcoin provider flows that a dApp uses, including connection, balance queries,
+transactions, message signing, EIP-712, BIP-322, and PSBT signing.
 
 The example dApp requires Noir Wallet to be installed in the same browser.
 

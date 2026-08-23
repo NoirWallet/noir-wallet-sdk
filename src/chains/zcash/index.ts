@@ -1,5 +1,5 @@
 export { getZcashProvider, detectProvider } from './provider'
-export { ZcashAPI } from './api'
+export { ZcashClient, ZcashAPI } from './api'
 export { publicKeyToAddress, verifyMessageSignature } from './utils'
 export type {
   ZcashProvider,

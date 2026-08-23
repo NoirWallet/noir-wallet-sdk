@@ -17,7 +17,8 @@ import type {
   TransactionHistoryEntry
 } from './types'
 
-export class ZcashAPI {
+/** High-level Zcash SDK client built on top of the injected request provider. */
+export class ZcashClient {
   private provider: ZcashProvider
 
   constructor(provider: ZcashProvider) {
@@ -142,10 +143,10 @@ export class ZcashAPI {
     return this.provider.request({ method: 'zcash_getTransactionHistory' })
   }
 
-  /** @deprecated Network is determined at build time. Install the testnet extension instead. */
+  /** @deprecated Global network mode is controlled in Noir Wallet settings. */
   async switchNetwork(_network: Network): Promise<never> {
     throw new Error(
-      'switchNetwork() is deprecated. Install the [Testnet] Noir Wallet extension instead.'
+      'switchNetwork() is deprecated. Change global network mode in Noir Wallet settings; the extension will restart before using the selected mode.'
     )
   }
 
@@ -165,3 +166,9 @@ export class ZcashAPI {
     this.provider.removeListener?.(event, handler)
   }
 }
+
+/** @deprecated Use {@link ZcashClient}. */
+export type ZcashAPI = ZcashClient
+
+/** @deprecated Use {@link ZcashClient}. */
+export const ZcashAPI = ZcashClient

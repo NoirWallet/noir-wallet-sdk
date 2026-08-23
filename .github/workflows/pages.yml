@@ -2,7 +2,14 @@ name: Deploy Example to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2]
+    paths:
+      - '.github/workflows/pages.yml'
+      - 'example/**'
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
   workflow_dispatch:
 
 permissions:
@@ -18,23 +25,59 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout V1
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          path: v1
+
+      - name: Checkout V2
+        uses: actions/checkout@v5
+        with:
+          ref: v2
+          path: v2
+
       - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.4
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: Install V1 dependencies
+        working-directory: v1
+        run: pnpm install --frozen-lockfile
 
-      - name: Build example for GitHub Pages
+      - name: Build V1 SDK and Example
+        working-directory: v1
         env:
           GITHUB_PAGES: true
-        run: pnpm --filter @noir-wallet/example build
+        run: |
+          pnpm build
+          pnpm --filter @noir-wallet/example build
+
+      - name: Install V2 dependencies
+        working-directory: v2
+        run: pnpm install --frozen-lockfile
+
+      - name: Build V2 SDK and Example
+        working-directory: v2
+        env:
+          GITHUB_PAGES_BASE: /noir-wallet-sdk/v2/
+        run: |
+          pnpm build
+          pnpm --filter @noir-wallet/example build
+
+      - name: Assemble versioned Pages site
+        run: |
+          mkdir -p site/v1 site/v2
+          cp -R v1/example/dist/. site/
+          cp -R v1/example/dist/. site/v1/
+          cp -R v2/example/dist/. site/v2/
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: example/dist
+          path: site
 
   deploy:
     needs: build

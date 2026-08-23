@@ -12,8 +12,17 @@ import {
   type SignMessageResult,
   type LendingMcaStatus,
   type SigningMode,
-  type TransactionHistoryEntry
+  type TransactionHistoryEntry,
+  type Network
 } from '@noir-wallet/sdk'
+import {
+  BitcoinExample,
+  EvmExample,
+  ProviderSwitcher,
+  type ExampleNavigationProps,
+  type ExampleProviderId
+} from './ProviderExamples'
+import { EVM_NETWORK_EXAMPLES, getEvmNetworkExamples } from './evm-network-catalog'
 import './App.css'
 
 type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch' | 'history'
@@ -89,9 +98,7 @@ function ResultField({
   )
 }
 
-function groupTxByDate(
-  txs: TransactionHistoryEntry[]
-): [string, TransactionHistoryEntry[]][] {
+function groupTxByDate(txs: TransactionHistoryEntry[]): [string, TransactionHistoryEntry[]][] {
   const map = new Map<string, TransactionHistoryEntry[]>()
   for (const tx of txs) {
     const date =
@@ -144,10 +151,12 @@ const STATUS_LABELS: Record<string, string> = {
 
 function TxRow({
   tx,
+  network,
   expanded,
   onToggle
 }: {
   tx: TransactionHistoryEntry
+  network: Network
   expanded: boolean
   onToggle: () => void
 }) {
@@ -159,7 +168,9 @@ function TxRow({
         <div className="tx-info">
           <div className="tx-info-top">
             <span className="tx-type">{TX_LABELS[kind] ?? kind} ZEC</span>
-            <span className={`tx-status ${tx.status}`}>{STATUS_LABELS[tx.status] ?? tx.status}</span>
+            <span className={`tx-status ${tx.status}`}>
+              {STATUS_LABELS[tx.status] ?? tx.status}
+            </span>
           </div>
           {tx.timestamp > 0 && (
             <div className="tx-time">
@@ -196,7 +207,11 @@ function TxRow({
                     <td>
                       {key === 'txid' ? (
                         <a
-                          href={`https://blockchair.com/zcash/transaction/${display}`}
+                          href={
+                            network === 'testnet'
+                              ? `https://testnet.cipherscan.app/tx/${display}`
+                              : `https://blockchair.com/zcash/transaction/${display}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ color: 'var(--color-primary)' }}
@@ -219,6 +234,23 @@ function TxRow({
 }
 
 function App() {
+  const [activeProvider, setActiveProvider] = useState<ExampleProviderId>('zcash')
+  const [exampleNetworkMode, setExampleNetworkMode] = useState<'mainnet' | 'testnet'>('mainnet')
+  const [selectedEvmNetwork, setSelectedEvmNetwork] = useState(EVM_NETWORK_EXAMPLES[0])
+  const handleExampleNetworkModeChange = (mode: 'mainnet' | 'testnet') => {
+    setExampleNetworkMode(mode)
+    setSelectedEvmNetwork(current =>
+      current.mode === mode ? current : (getEvmNetworkExamples(mode)[0] ?? current)
+    )
+  }
+  const exampleNavigation: ExampleNavigationProps = {
+    active: activeProvider,
+    onChange: setActiveProvider,
+    networkMode: exampleNetworkMode,
+    onNetworkModeChange: handleExampleNetworkModeChange,
+    selectedEvmNetwork,
+    onSelectEvmNetwork: setSelectedEvmNetwork
+  }
   const [noirWallet, setNoirWallet] = useState(() => getNoirWallet())
   const isInstalled = !!noirWallet
 
@@ -303,6 +335,8 @@ function App() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null)
+
+  const zcashNetwork: Network = addresses?.transparent.startsWith('tm') ? 'testnet' : 'mainnet'
 
   useEffect(() => {
     if (!noirWallet) return
@@ -508,7 +542,7 @@ function App() {
         signature: verifyForm.signature,
         pubkey: verifyForm.pubkey || undefined,
         address: verifyForm.address || undefined,
-        network: 'mainnet'
+        network: zcashNetwork
       })
       if (result.error) {
         setVerifyResult({ success: false, message: result.error, data: result })
@@ -627,7 +661,7 @@ function App() {
     e.preventDefault()
     if (!convertForm.pubkey) return
     try {
-      const address = publicKeyToAddress(convertForm.pubkey, 'mainnet')
+      const address = publicKeyToAddress(convertForm.pubkey, zcashNetwork)
       setConvertResult({ success: true, address })
     } catch (err: any) {
       setConvertResult({ success: false, error: err.message || 'Conversion failed' })
@@ -672,24 +706,35 @@ function App() {
     { id: 'history', label: 'History' }
   ]
 
+  if (activeProvider === 'evm') {
+    return <EvmExample navigation={exampleNavigation} />
+  }
+  if (activeProvider === 'bitcoin') {
+    return <BitcoinExample navigation={exampleNavigation} />
+  }
+
   return (
     <div className="app">
       <header className="header">
         <div className="header-content">
           <div className="logo">
             <a href="/" className="logo-link">
-              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Noir Wallet" className="logo-img" />
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Noir Wallet"
+                className="logo-img"
+              />
               <span className="logo-text">
                 <span className="logo-noir">Noir </span>
                 <span className="logo-wallet">Wallet</span>
               </span>
             </a>
-            <span className="logo-badge">SDK Example</span>
+            <span className="logo-badge">SDK Example V2</span>
           </div>
           <div className="header-status">
-            {!isInstalled && <span className="status-badge disconnected">Not Detected</span>}
+            {!isInstalled && <span className="status-badge unavailable">Not detected</span>}
             {isInstalled && !connected && (
-              <span className="status-badge disconnected">Disconnected</span>
+              <span className="status-badge ready">Provider ready</span>
             )}
             {connected && <span className="status-badge connected">Connected</span>}
           </div>
@@ -697,19 +742,28 @@ function App() {
       </header>
 
       <main className="main">
+        <section className="page-intro">
+          <div>
+            <p className="eyebrow">Noir Wallet developer tools</p>
+            <h1>Multichain SDK Playground</h1>
+          </div>
+        </section>
+        <ProviderSwitcher {...exampleNavigation} />
         {error && <div className="message error">{error}</div>}
 
         {!isInstalled && (
           <div className="card install-prompt">
-            <h2>🔒 Wallet Not Detected</h2>
+            <div className="empty-state-icon">N</div>
+            <h2>Wallet not detected</h2>
             <p>Install the Noir Wallet extension to use this example.</p>
           </div>
         )}
 
         {isInstalled && !connected && (
           <div className="card connect-section">
-            <h2>🔗 Connect Wallet</h2>
-            <p>Click below to connect your Noir Wallet</p>
+            <div className="empty-state-icon">Z</div>
+            <h2>Connect Zcash provider</h2>
+            <p>Authorize this example to access the selected Noir Wallet account.</p>
             <button className="btn btn-primary" onClick={connect} disabled={loading}>
               {loading ? (
                 <>
@@ -743,7 +797,7 @@ function App() {
             {activeTab === 'overview' && (
               <div className="tab-panel grid-2">
                 <div className="card card-compact">
-                  <h2>📦 Account</h2>
+                  <h2>Account</h2>
                   <div className="account-addresses">
                     <div className="address-item">
                       <label className="label">Transparent</label>
@@ -774,7 +828,7 @@ function App() {
 
                 <div className="card card-compact">
                   <div className="card-header">
-                    <h2>💰 Balance</h2>
+                    <h2>Balance</h2>
                     <button className="btn btn-secondary btn-xs" onClick={refreshBalance}>
                       Refresh
                     </button>
@@ -834,7 +888,7 @@ function App() {
             {activeTab === 'send' && (
               <div className="tab-panel">
                 <div className="card card-compact">
-                  <h2>📤 Send Transaction</h2>
+                  <h2>Send transaction</h2>
                   <p className="card-hint">
                     Cached available:{' '}
                     <strong>
@@ -969,7 +1023,7 @@ function App() {
             {activeTab === 'signing' && (
               <div className="tab-panel grid-2">
                 <div className="card card-compact">
-                  <h2>✍️ Sign Message</h2>
+                  <h2>Sign message</h2>
                   <div className="form-group">
                     <label className="label">Signing Mode</label>
                     <SigningModeSelector value={signingMode} onChange={setSigningMode} />
@@ -1034,7 +1088,7 @@ function App() {
                 </div>
 
                 <div className="card card-compact">
-                  <h2>✅ Verify Signature</h2>
+                  <h2>Verify signature</h2>
                   <p className="card-hint">
                     Recovers signer from message + signature; optionally checks against pubkey or
                     address.
@@ -1160,7 +1214,7 @@ function App() {
             {activeTab === 'tools' && (
               <div className="tab-panel grid-2">
                 <div className="card card-compact">
-                  <h2>🔑 Public Key</h2>
+                  <h2>Public key</h2>
                   <div className="form-group">
                     <label className="label">Signing Mode</label>
                     <SigningModeSelector value={signingMode} onChange={setSigningMode} />
@@ -1209,7 +1263,7 @@ function App() {
                 </div>
 
                 <div className="card card-compact">
-                  <h2>🔄 Pubkey → Address</h2>
+                  <h2>Public key to address</h2>
                   <form onSubmit={handleConvertPubkey} className="form-stack">
                     <div className="form-group">
                       <label className="label">Public Key (hex)</label>
@@ -1248,7 +1302,7 @@ function App() {
                 </div>
 
                 <div className="card card-compact grid-span-2">
-                  <h2>🏦 Lending MCA</h2>
+                  <h2>Lending MCA</h2>
                   <button
                     className="btn btn-primary btn-full"
                     onClick={handleCheckMca}
@@ -1319,6 +1373,7 @@ function App() {
                             <TxRow
                               key={`${tx.txid}-${i}`}
                               tx={tx}
+                              network={zcashNetwork}
                               expanded={expandedTxId === tx.txid}
                               onToggle={() =>
                                 setExpandedTxId(prev => (prev === tx.txid ? null : tx.txid))
@@ -1337,7 +1392,7 @@ function App() {
               <div className="tab-panel">
                 <div className="card card-compact">
                   <div className="card-header">
-                    <h2>👛 Multi-Wallet Access</h2>
+                    <h2>Multi-wallet access</h2>
                     <div className="btn-row">
                       <button
                         className="btn btn-primary btn-xs"
@@ -1427,7 +1482,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Noir Wallet SDK Example</p>
+        <p>Noir Wallet SDK Example V2</p>
       </footer>
     </div>
   )
