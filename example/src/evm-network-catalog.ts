@@ -1,6 +1,6 @@
 import type { AddEvmNetworkParameters } from '@noir-wallet/sdk'
 
-const RHEA_CHAIN_ICON_BASE = 'https://img.rhea.finance/images'
+const EXAMPLE_CHAIN_ICON_BASE = 'https://assets.zknoir.com/chain'
 
 export type ExampleChainIcon =
   | 'arbitrum'
@@ -18,21 +18,23 @@ export type ExampleChainIcon =
   | 'xlayer'
   | 'zcash'
 
+const chainIconUrl = (chain: ExampleChainIcon) => `${EXAMPLE_CHAIN_ICON_BASE}/${chain}.svg`
+
 const EXAMPLE_CHAIN_ICON_URLS: Readonly<Record<ExampleChainIcon, string>> = Object.freeze({
-  arbitrum: `${RHEA_CHAIN_ICON_BASE}/arbitrum-chain-icon.svg`,
-  avalanche: `${RHEA_CHAIN_ICON_BASE}/avax-chain-icon.svg`,
-  base: `${RHEA_CHAIN_ICON_BASE}/base-chain-icon.svg`,
-  berachain: `${RHEA_CHAIN_ICON_BASE}/bera-chain-icon.svg`,
-  bitcoin: `${RHEA_CHAIN_ICON_BASE}/btc.svg`,
-  bsc: `${RHEA_CHAIN_ICON_BASE}/bsc-chain-icon.svg`,
-  ethereum: `${RHEA_CHAIN_ICON_BASE}/ethereum-chain-icon.svg`,
-  gnosis: `${RHEA_CHAIN_ICON_BASE}/gnosis-chain-icon.svg`,
-  monad: 'https://near-intents.org/static/icons/network/monad.svg',
-  optimism: `${RHEA_CHAIN_ICON_BASE}/optimism-chain-icon.svg`,
-  plasma: `${RHEA_CHAIN_ICON_BASE}/plasma-chain-icon2.svg`,
-  polygon: `${RHEA_CHAIN_ICON_BASE}/polygon-chain-icon.svg`,
-  xlayer: `${RHEA_CHAIN_ICON_BASE}/x-layer-chain-icon.svg`,
-  zcash: `${RHEA_CHAIN_ICON_BASE}/zcash-chain-icon.svg`
+  arbitrum: chainIconUrl('arbitrum'),
+  avalanche: chainIconUrl('avalanche'),
+  base: chainIconUrl('base'),
+  berachain: chainIconUrl('berachain'),
+  bitcoin: chainIconUrl('bitcoin'),
+  bsc: chainIconUrl('bsc'),
+  ethereum: chainIconUrl('ethereum'),
+  gnosis: chainIconUrl('gnosis'),
+  monad: chainIconUrl('monad'),
+  optimism: chainIconUrl('optimism'),
+  plasma: chainIconUrl('plasma'),
+  polygon: chainIconUrl('polygon'),
+  xlayer: chainIconUrl('xlayer'),
+  zcash: chainIconUrl('zcash')
 })
 
 export function getExampleChainIconUrl(chain: ExampleChainIcon): string {

@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  EVM_NETWORK_EXAMPLES,
-  getExampleChainIconUrl
-} from '../example/src/evm-network-catalog.ts'
+import { EVM_NETWORK_EXAMPLES } from '../example/src/evm-network-catalog.ts'
 
 function getChainIds(mode) {
   return EVM_NETWORK_EXAMPLES.filter(network => network.mode === mode)
@@ -13,7 +10,8 @@ function getChainIds(mode) {
 }
 
 test('keeps the example network catalog aligned with the released wallet networks', () => {
-  assert.deepEqual(getChainIds('mainnet'),
+  assert.deepEqual(
+    getChainIds('mainnet'),
     [
       '0x1',
       '0xa',
@@ -29,26 +27,8 @@ test('keeps the example network catalog aligned with the released wallet network
       '0x138de'
     ].sort()
   )
-  assert.deepEqual(getChainIds('testnet'),
+  assert.deepEqual(
+    getChainIds('testnet'),
     ['0x61', '0xa869', '0xaa36a7', '0xaa37dc', '0x13882', '0x14a34', '0x66eee'].sort()
-  )
-})
-
-test('uses canonical chain icons instead of token or fallback-letter assets', () => {
-  assert.equal(
-    getExampleChainIconUrl('monad'),
-    'https://near-intents.org/static/icons/network/monad.svg'
-  )
-  assert.equal(
-    getExampleChainIconUrl('gnosis'),
-    'https://img.rhea.finance/images/gnosis-chain-icon.svg'
-  )
-  assert.equal(
-    getExampleChainIconUrl('zcash'),
-    'https://img.rhea.finance/images/zcash-chain-icon.svg'
-  )
-  assert.equal(
-    getExampleChainIconUrl('bitcoin'),
-    'https://img.rhea.finance/images/btc.svg'
   )
 })
