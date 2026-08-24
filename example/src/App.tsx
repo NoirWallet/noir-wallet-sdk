@@ -17,12 +17,17 @@ import {
 } from '@noir-wallet/sdk'
 import {
   BitcoinExample,
+  ExampleChainIcon,
   EvmExample,
   ProviderSwitcher,
   type ExampleNavigationProps,
   type ExampleProviderId
 } from './ProviderExamples'
-import { EVM_NETWORK_EXAMPLES, getEvmNetworkExamples } from './evm-network-catalog'
+import {
+  EVM_NETWORK_EXAMPLES,
+  getEvmNetworkExamples,
+  getExampleChainIconUrl
+} from './evm-network-catalog'
 import './App.css'
 
 type TabId = 'overview' | 'send' | 'signing' | 'tools' | 'batch' | 'history'
@@ -761,7 +766,11 @@ function App() {
 
         {isInstalled && !connected && (
           <div className="card connect-section">
-            <div className="empty-state-icon">Z</div>
+            <ExampleChainIcon
+              className="empty-state-icon"
+              iconUrl={getExampleChainIconUrl('zcash')}
+              label="Zcash"
+            />
             <h2>Connect Zcash provider</h2>
             <p>Authorize this example to access the selected Noir Wallet account.</p>
             <button className="btn btn-primary" onClick={connect} disabled={loading}>

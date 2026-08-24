@@ -173,6 +173,24 @@
     transform var(--transition-fast);
 }
 
+.example-chain-icon {
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.example-chain-icon > span {
+  position: absolute;
+}
+
+.example-chain-icon img {
+  z-index: 1;
+  display: block;
+  border-radius: 50%;
+  background: #20242f;
+  object-fit: contain;
+}
+
 .provider-network-icon-frame img {
   position: absolute;
   width: 38px;
@@ -203,7 +221,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 50%;
   font-weight: 760;
 }
 
@@ -246,14 +264,16 @@
   font-size: 20px;
 }
 
-.provider-hero-icon-evm {
-  background: linear-gradient(145deg, #778dff, #4d5fce);
-  box-shadow: 0 12px 26px rgba(89, 107, 224, 0.2);
+.provider-hero-icon {
+  border: 1px solid var(--border-strong);
+  background: #20242f;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
 }
 
-.provider-hero-icon-bitcoin {
-  background: linear-gradient(145deg, #ffad33, #e47a09);
-  box-shadow: 0 12px 26px rgba(236, 134, 17, 0.18);
+.provider-hero-icon img,
+.empty-state-icon img {
+  width: 38px;
+  height: 38px;
 }
 
 .provider-summary h2 {
