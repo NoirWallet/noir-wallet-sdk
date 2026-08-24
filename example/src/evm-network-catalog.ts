@@ -1,9 +1,15 @@
 import type { AddEvmNetworkParameters } from '@noir-wallet/sdk'
 
 const EXAMPLE_CHAIN_ICON_BASE = `${import.meta.env.BASE_URL}chains`
+const RHEA_CHAIN_ICON_BASE = 'https://img.rhea.finance/images'
 
 export function getExampleChainIconUrl(fileName: string): string {
+  if (fileName.startsWith('https://')) return fileName
   return `${EXAMPLE_CHAIN_ICON_BASE}/${fileName}`
+}
+
+function getRheaChainIconUrl(fileName: string): string {
+  return `${RHEA_CHAIN_ICON_BASE}/${fileName}`
 }
 
 export interface EvmNetworkExample {
@@ -76,6 +82,41 @@ export const EVM_NETWORK_EXAMPLES = Object.freeze([
     nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
     rpcUrls: ['https://api.avax.network/ext/bc/C/rpc'],
     blockExplorerUrls: ['https://snowtrace.io']
+  }),
+  network('mainnet', 'Monad', getRheaChainIconUrl('monad_logo.png'), {
+    chainId: '0x8f',
+    chainName: 'Monad',
+    nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+    rpcUrls: ['https://rpc.monad.xyz'],
+    blockExplorerUrls: ['https://monadscan.com']
+  }),
+  network('mainnet', 'Gnosis', getRheaChainIconUrl('gnosis-chain-icon.svg'), {
+    chainId: '0x64',
+    chainName: 'Gnosis',
+    nativeCurrency: { name: 'xDAI', symbol: 'xDAI', decimals: 18 },
+    rpcUrls: ['https://rpc.gnosischain.com'],
+    blockExplorerUrls: ['https://gnosisscan.io']
+  }),
+  network('mainnet', 'Plasma', getRheaChainIconUrl('plasma-chain-icon2.svg'), {
+    chainId: '0x2611',
+    chainName: 'Plasma',
+    nativeCurrency: { name: 'Plasma', symbol: 'XPL', decimals: 18 },
+    rpcUrls: ['https://rpc.plasma.to'],
+    blockExplorerUrls: ['https://plasmascan.to']
+  }),
+  network('mainnet', 'X Layer', getRheaChainIconUrl('x-layer-chain-icon.svg'), {
+    chainId: '0xc4',
+    chainName: 'X Layer',
+    nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
+    rpcUrls: ['https://rpc.xlayer.tech'],
+    blockExplorerUrls: ['https://www.okx.com/web3/explorer/xlayer']
+  }),
+  network('mainnet', 'Berachain', getRheaChainIconUrl('bera-chain-icon.svg'), {
+    chainId: '0x138de',
+    chainName: 'Berachain',
+    nativeCurrency: { name: 'Berachain', symbol: 'BERA', decimals: 18 },
+    rpcUrls: ['https://rpc.berachain.com/'],
+    blockExplorerUrls: ['https://berascan.com']
   }),
   network('testnet', 'Sepolia', 'ethereum.svg', {
     chainId: '0xaa36a7',
