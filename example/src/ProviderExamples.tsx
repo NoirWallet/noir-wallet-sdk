@@ -65,6 +65,30 @@ export interface ExampleNavigationProps {
   onSelectEvmNetwork: (network: EvmNetworkExample) => void
 }
 
+export function ExampleChainIcon({
+  iconUrl,
+  label,
+  className
+}: {
+  iconUrl: string
+  label: string
+  className: string
+}) {
+  return (
+    <span className={`${className} example-chain-icon`} aria-hidden="true">
+      <span>{label.slice(0, 1)}</span>
+      <img
+        src={iconUrl}
+        alt=""
+        crossOrigin="anonymous"
+        onError={event => {
+          event.currentTarget.hidden = true
+        }}
+      />
+    </span>
+  )
+}
+
 export function ProviderSwitcher({
   active,
   onChange,
@@ -77,7 +101,7 @@ export function ProviderSwitcher({
     {
       id: 'zcash' as const,
       label: 'Zcash',
-      iconUrl: getExampleChainIconUrl('zcash.svg')
+      iconUrl: getExampleChainIconUrl('zcash')
     },
     ...getEvmNetworkExamples(networkMode).map(network => ({
       id: 'evm' as const,
@@ -85,7 +109,7 @@ export function ProviderSwitcher({
       iconUrl: network.iconUrl,
       network
     })),
-    { id: 'bitcoin' as const, label: 'Bitcoin', iconUrl: getExampleChainIconUrl('bitcoin.svg') }
+    { id: 'bitcoin' as const, label: 'Bitcoin', iconUrl: getExampleChainIconUrl('bitcoin') }
   ]
   return (
     <nav className="provider-network-nav" aria-label="Provider examples">
@@ -124,17 +148,11 @@ export function ProviderSwitcher({
                 onChange(option.id)
               }}
             >
-              <span className="provider-network-icon-frame">
-                <span aria-hidden="true">{option.label.slice(0, 1)}</span>
-                <img
-                  src={option.iconUrl}
-                  alt=""
-                  crossOrigin="anonymous"
-                  onError={event => {
-                    event.currentTarget.hidden = true
-                  }}
-                />
-              </span>
+              <ExampleChainIcon
+                className="provider-network-icon-frame"
+                iconUrl={option.iconUrl}
+                label={option.label}
+              />
               <span>{option.label}</span>
             </button>
           )
@@ -447,7 +465,11 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
       {!provider && <div className="message warning">EVM provider is not enabled.</div>}
       <section className="provider-summary card">
         <div className="provider-summary-copy">
-          <span className="provider-hero-icon provider-hero-icon-evm">E</span>
+          <ExampleChainIcon
+            className="provider-hero-icon"
+            iconUrl={navigation.selectedEvmNetwork.iconUrl}
+            label={navigation.selectedEvmNetwork.label}
+          />
           <div>
             <p className="section-kicker">Selected provider</p>
             <h2>EVM provider</h2>
@@ -783,7 +805,11 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
       {!provider && <div className="message warning">Bitcoin provider is not enabled.</div>}
       <section className="provider-summary card">
         <div className="provider-summary-copy">
-          <span className="provider-hero-icon provider-hero-icon-bitcoin">₿</span>
+          <ExampleChainIcon
+            className="provider-hero-icon"
+            iconUrl={getExampleChainIconUrl('bitcoin')}
+            label="Bitcoin"
+          />
           <div>
             <p className="section-kicker">Selected provider</p>
             <h2>Bitcoin provider</h2>
