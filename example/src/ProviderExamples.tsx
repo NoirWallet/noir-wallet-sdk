@@ -113,12 +113,16 @@ export function ProviderSwitcher({
       network
     })),
     { id: 'bitcoin' as const, label: 'Bitcoin', iconUrl: getExampleChainIconUrl('bitcoin') },
-    ...(networkMode === 'testnet'
-      ? [
-          { id: 'solana' as const, label: 'Solana Devnet', iconUrl: getExampleChainIconUrl('solana') },
-          { id: 'near' as const, label: 'NEAR Testnet', iconUrl: getExampleChainIconUrl('near') }
-        ]
-      : [])
+    {
+      id: 'solana' as const,
+      label: networkMode === 'mainnet' ? 'Solana' : 'Solana Devnet',
+      iconUrl: getExampleChainIconUrl('solana')
+    },
+    {
+      id: 'near' as const,
+      label: networkMode === 'mainnet' ? 'NEAR' : 'NEAR Testnet',
+      iconUrl: getExampleChainIconUrl('near')
+    }
   ]
   return (
     <nav className="provider-network-nav" aria-label="Provider examples">
@@ -964,6 +968,9 @@ export function NativeTransferExample({
   const [balance, setBalance] = useState('')
   const [recipient, setRecipient] = useState('')
   const [amountRaw, setAmountRaw] = useState('')
+  const [tokenAssetId, setTokenAssetId] = useState('')
+  const [tokenBalance, setTokenBalance] = useState('')
+  const [tokenAmountRaw, setTokenAmountRaw] = useState('')
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -977,19 +984,14 @@ export function NativeTransferExample({
       chain === 'solana'
         ? detectSolanaProvider({ timeoutMs: 3000, signal: controller.signal })
         : detectNearProvider({ timeoutMs: 3000, signal: controller.signal })
-    detection
-      .then(setProvider)
-      .catch(discoveryError => {
-        if ((discoveryError as Error).name !== 'AbortError') setError(formatError(discoveryError))
-      })
+    detection.then(setProvider).catch(discoveryError => {
+      if ((discoveryError as Error).name !== 'AbortError') setError(formatError(discoveryError))
+    })
     return () => controller.abort()
   }, [chain, provider])
 
   const refresh = useCallback(async (current: NativeExampleProvider) => {
-    const [nextNetwork, accounts] = await Promise.all([
-      current.getNetwork(),
-      current.getAccounts()
-    ])
+    const [nextNetwork, accounts] = await Promise.all([current.getNetwork(), current.getAccounts()])
     const nextAccount = accounts[0] ?? ''
     setNetwork(`${nextNetwork.name} (${nextNetwork.chainId})`)
     setAccount(nextAccount)
@@ -1033,6 +1035,21 @@ export function NativeTransferExample({
     })
   }
 
+  const submitToken = (event: FormEvent) => {
+    event.preventDefault()
+    void run(async () => {
+      if (!provider || !account) throw new Error(`Connect a ${displayName} account first.`)
+      if (!/^[1-9][0-9]*$/.test(tokenAmountRaw)) {
+        throw new Error('Token amount must be a positive integer string in base units.')
+      }
+      return `Transaction: ${await provider.sendTokenTransfer(
+        tokenAssetId.trim(),
+        recipient.trim(),
+        tokenAmountRaw
+      )}`
+    })
+  }
+
   return (
     <ExampleLayout navigation={navigation} available={provider !== null} connected={account !== ''}>
       {!provider && <div className="message warning">{displayName} provider is not enabled.</div>}
@@ -1044,9 +1061,9 @@ export function NativeTransferExample({
             label={displayName}
           />
           <div>
-            <p className="section-kicker">Testnet Beta provider</p>
-            <h2>{displayName} native transfer provider</h2>
-            <p>Connect, query base-unit balances, and request approved native transfers.</p>
+            <p className="section-kicker">Mainnet &amp; Testnet provider</p>
+            <h2>{displayName} native and token transfer provider</h2>
+            <p>Connect, query base-unit balances, and request approved transfers.</p>
           </div>
         </div>
         <div className="provider-actions">
@@ -1087,7 +1104,9 @@ export function NativeTransferExample({
         <section className="card card-compact">
           <h2>Send native {displayName}</h2>
           <form className="form-stack" onSubmit={submit}>
-            <label className="label" htmlFor={`${chain}-recipient`}>Recipient</label>
+            <label className="label" htmlFor={`${chain}-recipient`}>
+              Recipient
+            </label>
             <input
               id={`${chain}-recipient`}
               className="input input-sm"
@@ -1095,7 +1114,9 @@ export function NativeTransferExample({
               onChange={event => setRecipient(event.target.value)}
               required
             />
-            <label className="label" htmlFor={`${chain}-amount`}>Amount ({unitName})</label>
+            <label className="label" htmlFor={`${chain}-amount`}>
+              Amount ({unitName})
+            </label>
             <input
               id={`${chain}-amount`}
               className="input input-sm"
@@ -1106,6 +1127,52 @@ export function NativeTransferExample({
             />
             <button className="btn btn-primary btn-full" disabled={!account || busy}>
               Send {displayName}
+            </button>
+          </form>
+        </section>
+        <section className="card card-compact">
+          <h2>Send token</h2>
+          <form className="form-stack" onSubmit={submitToken}>
+            <label className="label" htmlFor={`${chain}-token-asset`}>
+              CAIP-19 token asset ID
+            </label>
+            <input
+              id={`${chain}-token-asset`}
+              className="input input-sm"
+              value={tokenAssetId}
+              onChange={event => setTokenAssetId(event.target.value)}
+              required
+            />
+            <button
+              className="btn btn-secondary btn-full"
+              type="button"
+              disabled={!account || !tokenAssetId || busy}
+              onClick={() =>
+                void run(async () => {
+                  if (!provider) throw new Error(`${displayName} provider is unavailable.`)
+                  const token = await provider.getTokenBalance(tokenAssetId.trim())
+                  setTokenBalance(token.availableRaw)
+                  return `Token available: ${token.availableRaw}`
+                })
+              }
+            >
+              Read token balance
+            </button>
+            <Result label="Token available (base units)" value={tokenBalance || 'Unavailable'} />
+            <label className="label" htmlFor={`${chain}-token-amount`}>
+              Amount (base units)
+            </label>
+            <input
+              id={`${chain}-token-amount`}
+              className="input input-sm"
+              value={tokenAmountRaw}
+              onChange={event => setTokenAmountRaw(event.target.value)}
+              inputMode="numeric"
+              required
+            />
+            <p className="provider-hint">The token transfer uses the recipient entered above.</p>
+            <button className="btn btn-primary btn-full" disabled={!account || busy}>
+              Send token
             </button>
           </form>
         </section>

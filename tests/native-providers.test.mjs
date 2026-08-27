@@ -12,7 +12,9 @@ function provider() {
     getAccounts: async () => ['account'],
     getNetwork: async () => ({ chainId: 'test', name: 'testnet' }),
     getBalance: async () => ({ totalRaw: '1', spendableRaw: '1', availableRaw: '1' }),
+    getTokenBalance: async () => ({ totalRaw: '1', spendableRaw: '1', availableRaw: '1' }),
     sendTransfer: async () => 'hash',
+    sendTokenTransfer: async () => 'token-hash',
     on() {
       return this
     },

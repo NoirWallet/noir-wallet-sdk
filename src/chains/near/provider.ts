@@ -13,7 +13,9 @@ function isNearProvider(value: unknown): value is NearProvider {
     typeof provider.getAccounts === 'function' &&
     typeof provider.getNetwork === 'function' &&
     typeof provider.getBalance === 'function' &&
+    typeof provider.getTokenBalance === 'function' &&
     typeof provider.sendTransfer === 'function' &&
+    typeof provider.sendTokenTransfer === 'function' &&
     typeof provider.on === 'function' &&
     typeof provider.removeListener === 'function' &&
     typeof provider.disconnect === 'function'
