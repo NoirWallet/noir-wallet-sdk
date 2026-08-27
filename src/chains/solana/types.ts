@@ -21,6 +21,19 @@ export interface SolanaSignedMessage {
   readonly publicKey: Uint8Array
 }
 
+export type SolanaTransactionCommitment = 'processed' | 'confirmed' | 'finalized'
+
+export interface SolanaSignTransactionOptions {
+  readonly preflightCommitment?: SolanaTransactionCommitment
+  readonly minContextSlot?: number
+}
+
+export interface SolanaSignAndSendTransactionOptions extends SolanaSignTransactionOptions {
+  readonly commitment?: SolanaTransactionCommitment
+  readonly skipPreflight?: boolean
+  readonly maxRetries?: number
+}
+
 /**
  * Noir Wallet's Solana provider. Chain reads belong to the dApp's RPC client;
  * the wallet exposes authorization and signing only. Solana Wallet Standard is
@@ -32,9 +45,15 @@ export interface SolanaProvider {
   readonly publicKey: SolanaPublicKey | null
   connect(): Promise<SolanaConnectResult>
   disconnect(): Promise<void>
-  signTransaction(transaction: Uint8Array): Promise<Uint8Array>
+  signTransaction(
+    transaction: Uint8Array,
+    options?: SolanaSignTransactionOptions
+  ): Promise<Uint8Array>
   signAllTransactions(transactions: readonly Uint8Array[]): Promise<readonly Uint8Array[]>
-  signAndSendTransaction(transaction: Uint8Array): Promise<SolanaSignAndSendResult>
+  signAndSendTransaction(
+    transaction: Uint8Array,
+    options?: SolanaSignAndSendTransactionOptions
+  ): Promise<SolanaSignAndSendResult>
   signMessage(message: Uint8Array): Promise<SolanaSignedMessage>
   on(
     event: 'connect' | 'disconnect' | 'accountChanged' | 'accountsChanged',

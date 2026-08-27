@@ -47,8 +47,11 @@ export type {
   SolanaProvider,
   SolanaProviderListener,
   SolanaPublicKey,
+  SolanaSignAndSendTransactionOptions,
   SolanaSignAndSendResult,
-  SolanaSignedMessage
+  SolanaSignTransactionOptions,
+  SolanaSignedMessage,
+  SolanaTransactionCommitment
 } from './chains/solana'
 
 export type {
