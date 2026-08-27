@@ -7,18 +7,15 @@ function isNearProvider(value: unknown): value is NearProvider {
   if (!value || typeof value !== 'object') return false
   const provider = value as Partial<NearProvider>
   return (
-    typeof provider.request === 'function' &&
-    typeof provider.connect === 'function' &&
-    typeof provider.requestAccounts === 'function' &&
-    typeof provider.getAccounts === 'function' &&
-    typeof provider.getNetwork === 'function' &&
-    typeof provider.getBalance === 'function' &&
-    typeof provider.getTokenBalance === 'function' &&
-    typeof provider.sendTransfer === 'function' &&
-    typeof provider.sendTokenTransfer === 'function' &&
+    typeof provider.requestSignIn === 'function' &&
+    typeof provider.signOut === 'function' &&
+    typeof provider.isSignedIn === 'function' &&
+    typeof provider.getAccountId === 'function' &&
+    typeof provider.signTransaction === 'function' &&
+    typeof provider.requestSignTransactions === 'function' &&
+    typeof provider.signMessage === 'function' &&
     typeof provider.on === 'function' &&
-    typeof provider.removeListener === 'function' &&
-    typeof provider.disconnect === 'function'
+    typeof provider.removeListener === 'function'
   )
 }
 

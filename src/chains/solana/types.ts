@@ -1,48 +1,49 @@
-export interface SolanaRequestArguments {
-  readonly method: string
-  readonly params?: readonly unknown[]
-}
-
 export type SolanaProviderListener = (value: unknown) => void
 
+/** Minimal PublicKey-compatible object exposed by Noir Wallet's injected provider. */
+export interface SolanaPublicKey {
+  toBytes(): Uint8Array
+  toBuffer(): Uint8Array
+  toString(): string
+  equals(value: { readonly toString: () => string }): boolean
+}
+
 export interface SolanaConnectResult {
-  readonly address: string
+  readonly publicKey: SolanaPublicKey
 }
 
-export interface SolanaNetwork {
-  readonly chainId:
-    | 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
-    | 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
-  readonly name: 'mainnet-beta' | 'devnet'
+export interface SolanaSignAndSendResult {
+  readonly signature: string
 }
 
-export interface SolanaBalance {
-  readonly totalRaw: string
-  readonly spendableRaw: string
-  readonly availableRaw: string
+export interface SolanaSignedMessage {
+  readonly signature: Uint8Array
+  readonly publicKey: Uint8Array
 }
 
-/** Noir Wallet's Solana provider. Serialized transactions use canonical base64 wire bytes. */
+/**
+ * Noir Wallet's Solana provider. Chain reads belong to the dApp's RPC client;
+ * the wallet exposes authorization and signing only. Solana Wallet Standard is
+ * also registered globally for framework-level discovery.
+ */
 export interface SolanaProvider {
-  request<T = unknown>(args: SolanaRequestArguments): Promise<T>
+  readonly isNoirWallet: true
+  readonly isConnected: boolean
+  readonly publicKey: SolanaPublicKey | null
   connect(): Promise<SolanaConnectResult>
-  requestAccounts(): Promise<readonly string[]>
-  getAccounts(): Promise<readonly string[]>
-  getNetwork(): Promise<SolanaNetwork>
-  getBalance(): Promise<SolanaBalance>
-  /** Returns a trusted SPL token balance for its canonical CAIP-19 asset ID. */
-  getTokenBalance(assetId: string): Promise<SolanaBalance>
-  /** Sends native SOL. `lamports` must be a positive integer string. */
-  sendTransfer(recipient: string, lamports: string): Promise<string>
-  /** Sends a trusted SPL token amount in base units. */
-  sendTokenTransfer(assetId: string, recipient: string, amountRaw: string): Promise<string>
-  /** Returns the signed transaction without broadcasting it. */
-  signTransaction(transactionBase64: string): Promise<string>
-  /** Signs and broadcasts a serialized transaction, returning its first signature. */
-  signAndSendTransaction(transactionBase64: string): Promise<string>
-  on(event: string, handler: SolanaProviderListener): SolanaProvider
-  removeListener(event: string, handler: SolanaProviderListener): SolanaProvider
   disconnect(): Promise<void>
+  signTransaction(transaction: Uint8Array): Promise<Uint8Array>
+  signAllTransactions(transactions: readonly Uint8Array[]): Promise<readonly Uint8Array[]>
+  signAndSendTransaction(transaction: Uint8Array): Promise<SolanaSignAndSendResult>
+  signMessage(message: Uint8Array): Promise<SolanaSignedMessage>
+  on(
+    event: 'connect' | 'disconnect' | 'accountChanged' | 'accountsChanged',
+    handler: SolanaProviderListener
+  ): SolanaProvider
+  removeListener(
+    event: 'connect' | 'disconnect' | 'accountChanged' | 'accountsChanged',
+    handler: SolanaProviderListener
+  ): SolanaProvider
 }
 
 export interface DetectSolanaProviderOptions {

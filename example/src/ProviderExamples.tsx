@@ -242,6 +242,16 @@ function utf8ToHex(value: string): string {
   ).join('')}`
 }
 
+function base64ToBytes(value: string): Uint8Array {
+  return Uint8Array.from(atob(value), character => character.charCodeAt(0))
+}
+
+function bytesToBase64(value: Uint8Array): string {
+  let binary = ''
+  for (const byte of value) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
 function parseEther(value: string): string {
   const normalized = value.trim()
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(normalized)) {
@@ -964,19 +974,17 @@ export function NativeTransferExample({
   const walletProvider = getNoirWallet()?.[chain] ?? null
   const [provider, setProvider] = useState<NativeExampleProvider | null>(walletProvider)
   const [account, setAccount] = useState('')
-  const [network, setNetwork] = useState('')
-  const [balance, setBalance] = useState('')
-  const [recipient, setRecipient] = useState('')
-  const [amountRaw, setAmountRaw] = useState('')
-  const [tokenAssetId, setTokenAssetId] = useState('')
-  const [tokenBalance, setTokenBalance] = useState('')
-  const [tokenAmountRaw, setTokenAmountRaw] = useState('')
   const [serializedTransaction, setSerializedTransaction] = useState('')
+  const [message, setMessage] = useState('Hello Noir Wallet')
+  const [nearReceiver, setNearReceiver] = useState('')
+  const [nearMethod, setNearMethod] = useState('get_status')
+  const [nearArgs, setNearArgs] = useState('{}')
+  const [nearGas, setNearGas] = useState('30000000000000')
+  const [nearDeposit, setNearDeposit] = useState('0')
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const displayName = chain === 'solana' ? 'Solana' : 'NEAR'
-  const unitName = chain === 'solana' ? 'lamports' : 'yoctoNEAR'
 
   useEffect(() => {
     if (provider) return
@@ -991,25 +999,36 @@ export function NativeTransferExample({
     return () => controller.abort()
   }, [chain, provider])
 
-  const refresh = useCallback(async (current: NativeExampleProvider) => {
-    const [nextNetwork, accounts] = await Promise.all([current.getNetwork(), current.getAccounts()])
-    const nextAccount = accounts[0] ?? ''
-    setNetwork(`${nextNetwork.name} (${nextNetwork.chainId})`)
-    setAccount(nextAccount)
-    setBalance(nextAccount ? (await current.getBalance()).availableRaw : '')
-  }, [])
+  const refresh = useCallback(
+    async (current: NativeExampleProvider) => {
+      setAccount(
+        chain === 'solana'
+          ? ((current as SolanaProvider).publicKey?.toString() ?? '')
+          : ((current as NearProvider).getAccountId() ?? '')
+      )
+    },
+    [chain]
+  )
 
   useEffect(() => {
     if (!provider) return
     const onAccountsChanged = () => {
       void refresh(provider).catch(refreshError => setError(formatError(refreshError)))
     }
-    provider.on('accountsChanged', onAccountsChanged)
+    if (chain === 'solana') {
+      ;(provider as SolanaProvider).on('accountsChanged', onAccountsChanged)
+    } else {
+      ;(provider as NearProvider).on('accountChanged', onAccountsChanged)
+    }
     void refresh(provider).catch(refreshError => setError(formatError(refreshError)))
     return () => {
-      provider.removeListener('accountsChanged', onAccountsChanged)
+      if (chain === 'solana') {
+        ;(provider as SolanaProvider).removeListener('accountsChanged', onAccountsChanged)
+      } else {
+        ;(provider as NearProvider).removeListener('accountChanged', onAccountsChanged)
+      }
     }
-  }, [provider, refresh])
+  }, [chain, provider, refresh])
 
   const run = async (operation: () => Promise<string>) => {
     setBusy(true)
@@ -1025,29 +1044,23 @@ export function NativeTransferExample({
     }
   }
 
-  const submit = (event: FormEvent) => {
+  const signNearTransaction = (event: FormEvent) => {
     event.preventDefault()
     void run(async () => {
-      if (!provider || !account) throw new Error(`Connect a ${displayName} account first.`)
-      if (!/^[1-9][0-9]*$/.test(amountRaw)) {
-        throw new Error(`${unitName} must be a positive integer string.`)
-      }
-      return `Transaction: ${await provider.sendTransfer(recipient.trim(), amountRaw)}`
-    })
-  }
-
-  const submitToken = (event: FormEvent) => {
-    event.preventDefault()
-    void run(async () => {
-      if (!provider || !account) throw new Error(`Connect a ${displayName} account first.`)
-      if (!/^[1-9][0-9]*$/.test(tokenAmountRaw)) {
-        throw new Error('Token amount must be a positive integer string in base units.')
-      }
-      return `Transaction: ${await provider.sendTokenTransfer(
-        tokenAssetId.trim(),
-        recipient.trim(),
-        tokenAmountRaw
-      )}`
+      if (!provider || chain !== 'near' || !account)
+        throw new Error('Connect a NEAR account first.')
+      const signed = await (provider as NearProvider).signTransaction({
+        receiverId: nearReceiver.trim(),
+        actions: [
+          {
+            methodName: nearMethod.trim(),
+            args: JSON.parse(nearArgs) as Readonly<Record<string, unknown>>,
+            gas: nearGas,
+            deposit: nearDeposit
+          }
+        ]
+      })
+      return `Signed transaction: ${signed}`
     })
   }
 
@@ -1064,7 +1077,7 @@ export function NativeTransferExample({
           <div>
             <p className="section-kicker">Mainnet &amp; Testnet provider</p>
             <h2>{displayName} dApp provider</h2>
-            <p>Connect, query balances, and request approved transfers or transaction signatures.</p>
+            <p>Connect and request standard transaction or message signatures.</p>
           </div>
         </div>
         <div className="provider-actions">
@@ -1074,7 +1087,10 @@ export function NativeTransferExample({
             onClick={() =>
               void run(async () => {
                 if (!provider) throw new Error(`${displayName} provider is unavailable.`)
-                return `Connected ${(await provider.connect()).address}`
+                if (chain === 'solana') {
+                  return `Connected ${(await (provider as SolanaProvider).connect()).publicKey.toString()}`
+                }
+                return `Connected ${(await (provider as NearProvider).requestSignIn()).accountId}`
               })
             }
           >
@@ -1086,8 +1102,9 @@ export function NativeTransferExample({
             onClick={() =>
               void run(async () => {
                 if (!provider) throw new Error(`${displayName} provider is unavailable.`)
-                await provider.disconnect()
-                return `${displayName} permission revoked.`
+                if (chain === 'solana') await (provider as SolanaProvider).disconnect()
+                else await (provider as NearProvider).signOut()
+                return `${displayName} disconnected.`
               })
             }
           >
@@ -1097,86 +1114,57 @@ export function NativeTransferExample({
       </section>
       <div className="tab-panel grid-2">
         <section className="card card-compact">
-          <h2>Account &amp; network</h2>
-          <Result label="Network" value={network || 'Unavailable'} />
+          <h2>Authorized account</h2>
           <Result label="Address" value={account || 'Not connected'} />
-          <Result label={`Available (${unitName})`} value={balance || 'Unavailable'} />
+          <p className="provider-hint">
+            Balance and token reads use the dApp&apos;s own {displayName} RPC client.
+          </p>
         </section>
-        <section className="card card-compact">
-          <h2>Send native {displayName}</h2>
-          <form className="form-stack" onSubmit={submit}>
-            <label className="label" htmlFor={`${chain}-recipient`}>
-              Recipient
-            </label>
-            <input
-              id={`${chain}-recipient`}
-              className="input input-sm"
-              value={recipient}
-              onChange={event => setRecipient(event.target.value)}
-              required
-            />
-            <label className="label" htmlFor={`${chain}-amount`}>
-              Amount ({unitName})
-            </label>
-            <input
-              id={`${chain}-amount`}
-              className="input input-sm"
-              value={amountRaw}
-              onChange={event => setAmountRaw(event.target.value)}
-              inputMode="numeric"
-              required
-            />
-            <button className="btn btn-primary btn-full" disabled={!account || busy}>
-              Send {displayName}
-            </button>
-          </form>
-        </section>
-        <section className="card card-compact">
-          <h2>Send token</h2>
-          <form className="form-stack" onSubmit={submitToken}>
-            <label className="label" htmlFor={`${chain}-token-asset`}>
-              CAIP-19 token asset ID
-            </label>
-            <input
-              id={`${chain}-token-asset`}
-              className="input input-sm"
-              value={tokenAssetId}
-              onChange={event => setTokenAssetId(event.target.value)}
-              required
-            />
-            <button
-              className="btn btn-secondary btn-full"
-              type="button"
-              disabled={!account || !tokenAssetId || busy}
-              onClick={() =>
-                void run(async () => {
-                  if (!provider) throw new Error(`${displayName} provider is unavailable.`)
-                  const token = await provider.getTokenBalance(tokenAssetId.trim())
-                  setTokenBalance(token.availableRaw)
-                  return `Token available: ${token.availableRaw}`
-                })
-              }
-            >
-              Read token balance
-            </button>
-            <Result label="Token available (base units)" value={tokenBalance || 'Unavailable'} />
-            <label className="label" htmlFor={`${chain}-token-amount`}>
-              Amount (base units)
-            </label>
-            <input
-              id={`${chain}-token-amount`}
-              className="input input-sm"
-              value={tokenAmountRaw}
-              onChange={event => setTokenAmountRaw(event.target.value)}
-              inputMode="numeric"
-              required
-            />
-            <p className="provider-hint">The token transfer uses the recipient entered above.</p>
-            <button className="btn btn-primary btn-full" disabled={!account || busy}>
-              Send token
-            </button>
-          </form>
-        </section>
+        {chain === 'near' && (
+          <section className="card card-compact">
+            <h2>Sign NEAR function call</h2>
+            <form className="form-stack" onSubmit={signNearTransaction}>
+              <input
+                className="input input-sm"
+                value={nearReceiver}
+                onChange={event => setNearReceiver(event.target.value)}
+                placeholder="receiver.near"
+                required
+              />
+              <input
+                className="input input-sm"
+                value={nearMethod}
+                onChange={event => setNearMethod(event.target.value)}
+                placeholder="Method name"
+                required
+              />
+              <textarea
+                className="input"
+                value={nearArgs}
+                onChange={event => setNearArgs(event.target.value)}
+                rows={3}
+                aria-label="JSON arguments"
+              />
+              <input
+                className="input input-sm"
+                value={nearGas}
+                onChange={event => setNearGas(event.target.value)}
+                aria-label="Gas"
+                required
+              />
+              <input
+                className="input input-sm"
+                value={nearDeposit}
+                onChange={event => setNearDeposit(event.target.value)}
+                aria-label="Deposit in yoctoNEAR"
+                required
+              />
+              <button className="btn btn-primary btn-full" disabled={!account || busy}>
+                Sign transaction
+              </button>
+            </form>
+          </section>
+        )}
         {chain === 'solana' && (
           <section className="card card-compact">
             <h2>Sign serialized transaction</h2>
@@ -1198,9 +1186,9 @@ export function NativeTransferExample({
                   void run(async () => {
                     if (!provider) throw new Error('Solana provider is unavailable.')
                     const signed = await (provider as SolanaProvider).signTransaction(
-                      serializedTransaction.trim()
+                      base64ToBytes(serializedTransaction.trim())
                     )
-                    return `Signed transaction: ${signed}`
+                    return `Signed transaction: ${bytesToBase64(signed)}`
                   })
                 }
               >
@@ -1212,8 +1200,8 @@ export function NativeTransferExample({
                 onClick={() =>
                   void run(async () => {
                     if (!provider) throw new Error('Solana provider is unavailable.')
-                    const signature = await (provider as SolanaProvider).signAndSendTransaction(
-                      serializedTransaction.trim()
+                    const { signature } = await (provider as SolanaProvider).signAndSendTransaction(
+                      base64ToBytes(serializedTransaction.trim())
                     )
                     return `Transaction: ${signature}`
                   })
@@ -1224,6 +1212,38 @@ export function NativeTransferExample({
             </div>
           </section>
         )}
+        <section className="card card-compact">
+          <h2>Sign message</h2>
+          <textarea
+            className="input"
+            value={message}
+            onChange={event => setMessage(event.target.value)}
+            rows={4}
+          />
+          <button
+            className="btn btn-primary btn-full"
+            disabled={!account || !message || busy || (chain === 'near' && !nearReceiver)}
+            onClick={() =>
+              void run(async () => {
+                if (!provider) throw new Error(`${displayName} provider is unavailable.`)
+                if (chain === 'solana') {
+                  const signed = await (provider as SolanaProvider).signMessage(
+                    new TextEncoder().encode(message)
+                  )
+                  return `Signature: ${bytesToBase64(signed.signature)}`
+                }
+                const signed = await (provider as NearProvider).signMessage({
+                  message,
+                  recipient: nearReceiver.trim(),
+                  nonce: crypto.getRandomValues(new Uint8Array(32))
+                })
+                return `Signature: ${signed.signature}`
+              })
+            }
+          >
+            Sign message
+          </button>
+        </section>
       </div>
       {result && <div className="message success provider-result">{result}</div>}
       {error && <div className="message error provider-result">{error}</div>}

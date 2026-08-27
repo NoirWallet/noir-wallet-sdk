@@ -1,10 +1,17 @@
 export { detectNearProvider, getNearProvider } from './provider'
 export type {
   DetectNearProviderOptions,
-  NearBalance,
-  NearConnectResult,
-  NearNetwork,
+  NearAction,
+  NearFunctionCallAction,
   NearProvider,
   NearProviderListener,
-  NearRequestArguments
+  NearRequestSignInParams,
+  NearSignInResult,
+  NearSignMessageParams,
+  NearSignedMessage,
+  NearSignedTransactionBatch,
+  NearTransactionBatchRequest,
+  NearTransactionRequest,
+  NearTransferAction,
+  NearWalletSelectorFunctionCallAction
 } from './types'

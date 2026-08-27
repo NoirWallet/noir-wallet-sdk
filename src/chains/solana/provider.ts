@@ -7,17 +7,12 @@ function isSolanaProvider(value: unknown): value is SolanaProvider {
   if (!value || typeof value !== 'object') return false
   const provider = value as Partial<SolanaProvider>
   return (
-    typeof provider.request === 'function' &&
+    provider.isNoirWallet === true &&
     typeof provider.connect === 'function' &&
-    typeof provider.requestAccounts === 'function' &&
-    typeof provider.getAccounts === 'function' &&
-    typeof provider.getNetwork === 'function' &&
-    typeof provider.getBalance === 'function' &&
-    typeof provider.getTokenBalance === 'function' &&
-    typeof provider.sendTransfer === 'function' &&
-    typeof provider.sendTokenTransfer === 'function' &&
     typeof provider.signTransaction === 'function' &&
+    typeof provider.signAllTransactions === 'function' &&
     typeof provider.signAndSendTransaction === 'function' &&
+    typeof provider.signMessage === 'function' &&
     typeof provider.on === 'function' &&
     typeof provider.removeListener === 'function' &&
     typeof provider.disconnect === 'function'

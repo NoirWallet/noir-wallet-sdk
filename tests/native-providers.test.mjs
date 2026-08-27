@@ -4,19 +4,16 @@ import test from 'node:test'
 import { getNearProvider } from '../dist/chains/near/index.mjs'
 import { getSolanaProvider } from '../dist/chains/solana/index.mjs'
 
-function provider() {
+function solanaProvider() {
   return {
-    request: async () => null,
-    connect: async () => ({ address: 'account' }),
-    requestAccounts: async () => ['account'],
-    getAccounts: async () => ['account'],
-    getNetwork: async () => ({ chainId: 'test', name: 'testnet' }),
-    getBalance: async () => ({ totalRaw: '1', spendableRaw: '1', availableRaw: '1' }),
-    getTokenBalance: async () => ({ totalRaw: '1', spendableRaw: '1', availableRaw: '1' }),
-    sendTransfer: async () => 'hash',
-    sendTokenTransfer: async () => 'token-hash',
+    isNoirWallet: true,
+    isConnected: false,
+    publicKey: null,
+    connect: async () => ({ publicKey: null }),
     signTransaction: async value => value,
-    signAndSendTransaction: async () => 'signature',
+    signAllTransactions: async value => value,
+    signAndSendTransaction: async () => ({ signature: 'signature' }),
+    signMessage: async () => ({ signature: new Uint8Array(), publicKey: new Uint8Array() }),
     on() {
       return this
     },
@@ -27,9 +24,27 @@ function provider() {
   }
 }
 
+function nearProvider() {
+  return {
+    requestSignIn: async () => ({ accountId: 'account', accessKey: { publicKey: 'key' } }),
+    signOut: async () => {},
+    isSignedIn: () => false,
+    getAccountId: () => null,
+    signTransaction: async () => 'signed',
+    requestSignTransactions: async () => ({ txs: [] }),
+    signMessage: async () => ({ accountId: 'account', publicKey: 'key', signature: 'signature' }),
+    on() {
+      return this
+    },
+    removeListener() {
+      return this
+    }
+  }
+}
+
 test('discovers independently enabled Solana and NEAR providers', () => {
-  const solana = provider()
-  const near = provider()
+  const solana = solanaProvider()
+  const near = nearProvider()
   globalThis.window = { noirwallet: { solana, near } }
   try {
     assert.equal(getSolanaProvider(), solana)

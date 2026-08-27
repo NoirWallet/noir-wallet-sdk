@@ -43,22 +43,29 @@ export type {
 
 export type {
   DetectSolanaProviderOptions,
-  SolanaBalance,
   SolanaConnectResult,
-  SolanaNetwork,
   SolanaProvider,
   SolanaProviderListener,
-  SolanaRequestArguments
+  SolanaPublicKey,
+  SolanaSignAndSendResult,
+  SolanaSignedMessage
 } from './chains/solana'
 
 export type {
   DetectNearProviderOptions,
-  NearBalance,
-  NearConnectResult,
-  NearNetwork,
+  NearAction,
+  NearFunctionCallAction,
   NearProvider,
   NearProviderListener,
-  NearRequestArguments
+  NearRequestSignInParams,
+  NearSignInResult,
+  NearSignMessageParams,
+  NearSignedMessage,
+  NearSignedTransactionBatch,
+  NearTransactionBatchRequest,
+  NearTransactionRequest,
+  NearTransferAction,
+  NearWalletSelectorFunctionCallAction
 } from './chains/near'
 
 export {
