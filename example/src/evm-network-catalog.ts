@@ -15,6 +15,8 @@ export type ExampleChainIcon =
   | 'optimism'
   | 'plasma'
   | 'polygon'
+  | 'solana'
+  | 'near'
   | 'xlayer'
   | 'zcash'
 
@@ -33,6 +35,8 @@ const EXAMPLE_CHAIN_ICON_URLS: Readonly<Record<ExampleChainIcon, string>> = Obje
   optimism: chainIconUrl('optimism'),
   plasma: chainIconUrl('plasma'),
   polygon: chainIconUrl('polygon'),
+  solana: chainIconUrl('solana'),
+  near: chainIconUrl('near'),
   xlayer: chainIconUrl('xlayer'),
   zcash: chainIconUrl('zcash')
 })

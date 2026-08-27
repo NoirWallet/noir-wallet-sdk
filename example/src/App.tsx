@@ -19,6 +19,7 @@ import {
   BitcoinExample,
   ExampleChainIcon,
   EvmExample,
+  NativeTransferExample,
   ProviderSwitcher,
   type ExampleNavigationProps,
   type ExampleProviderId
@@ -244,6 +245,9 @@ function App() {
   const [selectedEvmNetwork, setSelectedEvmNetwork] = useState(EVM_NETWORK_EXAMPLES[0])
   const handleExampleNetworkModeChange = (mode: 'mainnet' | 'testnet') => {
     setExampleNetworkMode(mode)
+    if (mode === 'mainnet' && (activeProvider === 'solana' || activeProvider === 'near')) {
+      setActiveProvider('zcash')
+    }
     setSelectedEvmNetwork(current =>
       current.mode === mode ? current : (getEvmNetworkExamples(mode)[0] ?? current)
     )
@@ -716,6 +720,15 @@ function App() {
   }
   if (activeProvider === 'bitcoin') {
     return <BitcoinExample navigation={exampleNavigation} />
+  }
+  if (activeProvider === 'solana' || activeProvider === 'near') {
+    return (
+      <NativeTransferExample
+        key={activeProvider}
+        navigation={exampleNavigation}
+        chain={activeProvider}
+      />
+    )
   }
 
   return (

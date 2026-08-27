@@ -3,6 +3,8 @@ import { ZcashClient } from './chains/zcash/api'
 import type { ZcashProvider } from './chains/zcash/types'
 import type { BitcoinProvider } from './chains/bitcoin/types'
 import type { EvmProvider } from './chains/evm/types'
+import type { SolanaProvider } from './chains/solana/types'
+import type { NearProvider } from './chains/near/types'
 
 interface RawNoirWallet {
   isNoirWallet: true
@@ -10,6 +12,8 @@ interface RawNoirWallet {
   zcash: ZcashProvider
   ethereum?: EvmProvider
   bitcoin?: BitcoinProvider
+  solana?: SolanaProvider
+  near?: NearProvider
 }
 
 function isRawNoirWallet(value: unknown): value is RawNoirWallet {
@@ -34,7 +38,9 @@ export function getNoirWallet(): NoirWalletProvider | null {
     version: rawWallet.version,
     zcash: new ZcashClient(rawWallet.zcash),
     ...(rawWallet.ethereum ? { ethereum: rawWallet.ethereum } : {}),
-    ...(rawWallet.bitcoin ? { bitcoin: rawWallet.bitcoin } : {})
+    ...(rawWallet.bitcoin ? { bitcoin: rawWallet.bitcoin } : {}),
+    ...(rawWallet.solana ? { solana: rawWallet.solana } : {}),
+    ...(rawWallet.near ? { near: rawWallet.near } : {})
   }
 }
 

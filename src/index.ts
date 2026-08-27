@@ -7,6 +7,8 @@ export {
   switchEvmChain
 } from './chains/evm'
 export { detectBitcoinProvider, getBitcoinProvider } from './chains/bitcoin'
+export { detectSolanaProvider, getSolanaProvider } from './chains/solana'
+export { detectNearProvider, getNearProvider } from './chains/near'
 
 export type {
   NoirWalletProvider,
@@ -38,6 +40,26 @@ export type {
   BitcoinSignPsbtOptions,
   DetectBitcoinProviderOptions
 } from './chains/bitcoin'
+
+export type {
+  DetectSolanaProviderOptions,
+  SolanaBalance,
+  SolanaConnectResult,
+  SolanaNetwork,
+  SolanaProvider,
+  SolanaProviderListener,
+  SolanaRequestArguments
+} from './chains/solana'
+
+export type {
+  DetectNearProviderOptions,
+  NearBalance,
+  NearConnectResult,
+  NearNetwork,
+  NearProvider,
+  NearProviderListener,
+  NearRequestArguments
+} from './chains/near'
 
 export {
   getZcashProvider,
