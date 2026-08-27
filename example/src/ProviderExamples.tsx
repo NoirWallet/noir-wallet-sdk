@@ -84,7 +84,6 @@ export function ExampleChainIcon({
       <img
         src={iconUrl}
         alt=""
-        crossOrigin="anonymous"
         onError={event => {
           event.currentTarget.hidden = true
         }}
