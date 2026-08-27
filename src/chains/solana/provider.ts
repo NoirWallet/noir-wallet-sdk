@@ -16,6 +16,8 @@ function isSolanaProvider(value: unknown): value is SolanaProvider {
     typeof provider.getTokenBalance === 'function' &&
     typeof provider.sendTransfer === 'function' &&
     typeof provider.sendTokenTransfer === 'function' &&
+    typeof provider.signTransaction === 'function' &&
+    typeof provider.signAndSendTransaction === 'function' &&
     typeof provider.on === 'function' &&
     typeof provider.removeListener === 'function' &&
     typeof provider.disconnect === 'function'

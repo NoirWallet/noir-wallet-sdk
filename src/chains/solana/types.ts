@@ -22,7 +22,7 @@ export interface SolanaBalance {
   readonly availableRaw: string
 }
 
-/** Noir Wallet's Solana provider for native SOL and trusted SPL token transfers. */
+/** Noir Wallet's Solana provider. Serialized transactions use canonical base64 wire bytes. */
 export interface SolanaProvider {
   request<T = unknown>(args: SolanaRequestArguments): Promise<T>
   connect(): Promise<SolanaConnectResult>
@@ -36,6 +36,10 @@ export interface SolanaProvider {
   sendTransfer(recipient: string, lamports: string): Promise<string>
   /** Sends a trusted SPL token amount in base units. */
   sendTokenTransfer(assetId: string, recipient: string, amountRaw: string): Promise<string>
+  /** Returns the signed transaction without broadcasting it. */
+  signTransaction(transactionBase64: string): Promise<string>
+  /** Signs and broadcasts a serialized transaction, returning its first signature. */
+  signAndSendTransaction(transactionBase64: string): Promise<string>
   on(event: string, handler: SolanaProviderListener): SolanaProvider
   removeListener(event: string, handler: SolanaProviderListener): SolanaProvider
   disconnect(): Promise<void>

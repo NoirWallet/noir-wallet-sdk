@@ -15,6 +15,8 @@ function provider() {
     getTokenBalance: async () => ({ totalRaw: '1', spendableRaw: '1', availableRaw: '1' }),
     sendTransfer: async () => 'hash',
     sendTokenTransfer: async () => 'token-hash',
+    signTransaction: async value => value,
+    signAndSendTransaction: async () => 'signature',
     on() {
       return this
     },

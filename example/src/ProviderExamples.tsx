@@ -971,6 +971,7 @@ export function NativeTransferExample({
   const [tokenAssetId, setTokenAssetId] = useState('')
   const [tokenBalance, setTokenBalance] = useState('')
   const [tokenAmountRaw, setTokenAmountRaw] = useState('')
+  const [serializedTransaction, setSerializedTransaction] = useState('')
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1062,8 +1063,8 @@ export function NativeTransferExample({
           />
           <div>
             <p className="section-kicker">Mainnet &amp; Testnet provider</p>
-            <h2>{displayName} native and token transfer provider</h2>
-            <p>Connect, query base-unit balances, and request approved transfers.</p>
+            <h2>{displayName} dApp provider</h2>
+            <p>Connect, query balances, and request approved transfers or transaction signatures.</p>
           </div>
         </div>
         <div className="provider-actions">
@@ -1176,6 +1177,53 @@ export function NativeTransferExample({
             </button>
           </form>
         </section>
+        {chain === 'solana' && (
+          <section className="card card-compact">
+            <h2>Sign serialized transaction</h2>
+            <label className="label" htmlFor="solana-serialized-transaction">
+              Canonical base64 transaction
+            </label>
+            <textarea
+              id="solana-serialized-transaction"
+              className="input"
+              value={serializedTransaction}
+              onChange={event => setSerializedTransaction(event.target.value)}
+              rows={5}
+            />
+            <div className="provider-actions">
+              <button
+                className="btn btn-secondary"
+                disabled={!account || !serializedTransaction || busy}
+                onClick={() =>
+                  void run(async () => {
+                    if (!provider) throw new Error('Solana provider is unavailable.')
+                    const signed = await (provider as SolanaProvider).signTransaction(
+                      serializedTransaction.trim()
+                    )
+                    return `Signed transaction: ${signed}`
+                  })
+                }
+              >
+                Sign only
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!account || !serializedTransaction || busy}
+                onClick={() =>
+                  void run(async () => {
+                    if (!provider) throw new Error('Solana provider is unavailable.')
+                    const signature = await (provider as SolanaProvider).signAndSendTransaction(
+                      serializedTransaction.trim()
+                    )
+                    return `Transaction: ${signature}`
+                  })
+                }
+              >
+                Sign &amp; broadcast
+              </button>
+            </div>
+          </section>
+        )}
       </div>
       {result && <div className="message success provider-result">{result}</div>}
       {error && <div className="message error provider-result">{error}</div>}
