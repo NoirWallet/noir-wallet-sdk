@@ -19,6 +19,7 @@ function isBitcoinProvider(value: unknown): value is BitcoinProvider {
     typeof provider.signPsbt === 'function' &&
     typeof provider.signPsbts === 'function' &&
     typeof provider.pushPsbt === 'function' &&
+    typeof provider.pushTx === 'function' &&
     typeof provider.disconnect === 'function'
   )
 }

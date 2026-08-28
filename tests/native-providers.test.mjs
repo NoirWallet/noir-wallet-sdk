@@ -58,6 +58,7 @@ function bitcoinProvider() {
     signPsbt: async value => value,
     signPsbts: async values => values,
     pushPsbt: async () => 'txid',
+    pushTx: async () => 'txid',
     switchNetwork: async () => null,
     switchChain: async () => null,
     on() {

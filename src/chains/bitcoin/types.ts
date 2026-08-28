@@ -54,6 +54,8 @@ export interface BitcoinProvider {
   ): Promise<readonly string[]>
   /** Finalizes and broadcasts a complete PSBT, returning its transaction ID. */
   pushPsbt(psbtHex: string): Promise<string>
+  /** Broadcasts a complete raw transaction, returning its transaction ID. */
+  pushTx(options: { readonly rawtx: string }): Promise<string>
   /** Validates the requested network; global network mode is changed in wallet settings. */
   switchNetwork(network: BitcoinNetwork): Promise<null>
   /** Validates the requested chain; global network mode is changed in wallet settings. */
