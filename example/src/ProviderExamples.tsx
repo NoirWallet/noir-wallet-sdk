@@ -698,6 +698,7 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
   const [balance, setBalance] = useState<BitcoinBalance | null>(null)
   const [recipient, setRecipient] = useState('')
   const [satoshis, setSatoshis] = useState('')
+  const [feeRate, setFeeRate] = useState('')
   const [message, setMessage] = useState('Hello Noir Bitcoin')
   const [psbt, setPsbt] = useState('')
   const [result, setResult] = useState('')
@@ -803,7 +804,18 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
       if (!Number.isSafeInteger(amount) || amount <= 0) {
         throw new Error('Satoshis must be a positive safe integer.')
       }
-      const transactionId = await provider.sendBitcoin(recipient.trim(), amount)
+      const parsedFeeRate = feeRate === '' ? undefined : Number(feeRate)
+      if (
+        parsedFeeRate !== undefined &&
+        (!Number.isSafeInteger(parsedFeeRate) || parsedFeeRate <= 0)
+      ) {
+        throw new Error('Fee rate must be a positive integer in sat/vB.')
+      }
+      const transactionId = await provider.sendBitcoin(
+        recipient.trim(),
+        amount,
+        parsedFeeRate === undefined ? undefined : { feeRate: parsedFeeRate }
+      )
       return `Transaction: ${transactionId}`
     })
   }
@@ -821,6 +833,13 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
       if (!provider || !account) throw new Error('Connect a Bitcoin account first.')
       if (!/^(?:[0-9a-f]{2})+$/i.test(psbt.trim())) throw new Error('Enter a PSBT as hex bytes.')
       return `Signed PSBT: ${await provider.signPsbt(psbt.trim(), { autoFinalized: false })}`
+    })
+
+  const pushPsbt = () =>
+    run(async () => {
+      if (!provider || !account) throw new Error('Connect a Bitcoin account first.')
+      if (!/^(?:[0-9a-f]{2})+$/i.test(psbt.trim())) throw new Error('Enter a PSBT as hex bytes.')
+      return `Broadcast transaction: ${await provider.pushPsbt(psbt.trim())}`
     })
 
   return (
@@ -906,6 +925,17 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
               placeholder="bc1q… / tb1q…"
               required
             />
+            <label className="label" htmlFor="bitcoin-fee-rate">
+              Fee rate (sat/vB, optional)
+            </label>
+            <input
+              id="bitcoin-fee-rate"
+              className="input input-sm"
+              value={feeRate}
+              onChange={event => setFeeRate(event.target.value)}
+              inputMode="numeric"
+              placeholder="Wallet estimate"
+            />
             <label className="label" htmlFor="bitcoin-satoshis">
               Amount (satoshis)
             </label>
@@ -953,6 +983,13 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
             disabled={!account || !psbt || busy}
           >
             Sign PSBT
+          </button>
+          <button
+            className="btn btn-secondary btn-full"
+            onClick={() => void pushPsbt()}
+            disabled={!account || !psbt || busy}
+          >
+            Broadcast PSBT
           </button>
         </section>
       </div>

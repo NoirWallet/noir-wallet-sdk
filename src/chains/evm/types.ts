@@ -1,6 +1,6 @@
 export interface EvmRequestArguments {
   readonly method: string
-  readonly params?: readonly unknown[]
+  readonly params?: readonly unknown[] | Readonly<Record<string, unknown>>
 }
 
 export type EvmProviderListener = (value: unknown) => void

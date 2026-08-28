@@ -26,8 +26,13 @@ export interface BitcoinChainInfo {
 }
 
 export interface BitcoinSignPsbtOptions {
-  /** Noir Wallet currently returns a signed, non-finalized PSBT. */
-  readonly autoFinalized?: false
+  /** Defaults to true, matching the UniSat/OKX provider convention. */
+  readonly autoFinalized?: boolean
+}
+
+export interface BitcoinSendOptions {
+  /** Integer satoshis per virtual byte. The wallet estimates the fee when omitted. */
+  readonly feeRate?: number
 }
 
 /** Noir Wallet's Bitcoin provider, compatible with the supported UniSat-style surface. */
@@ -40,13 +45,15 @@ export interface BitcoinProvider {
   getChain(): Promise<BitcoinChainInfo>
   getPublicKey(): Promise<string>
   getBalance(): Promise<BitcoinBalance>
-  sendBitcoin(
-    recipient: string,
-    satoshis: number,
-    options?: Readonly<Record<string, never>>
-  ): Promise<string>
+  sendBitcoin(recipient: string, satoshis: number, options?: BitcoinSendOptions): Promise<string>
   signMessage(message: string, type?: 'bip322-simple'): Promise<string>
   signPsbt(psbtHex: string, options?: BitcoinSignPsbtOptions): Promise<string>
+  signPsbts(
+    psbtHexes: readonly string[],
+    options?: readonly (BitcoinSignPsbtOptions | undefined)[]
+  ): Promise<readonly string[]>
+  /** Finalizes and broadcasts a complete PSBT, returning its transaction ID. */
+  pushPsbt(psbtHex: string): Promise<string>
   /** Validates the requested network; global network mode is changed in wallet settings. */
   switchNetwork(network: BitcoinNetwork): Promise<null>
   /** Validates the requested chain; global network mode is changed in wallet settings. */
