@@ -44,6 +44,8 @@ export interface SolanaProvider {
   readonly isConnected: boolean
   readonly publicKey: SolanaPublicKey | null
   connect(): Promise<SolanaConnectResult>
+  /** Addresses explicitly authorized for this site. The current address is first. */
+  getAccounts(): Promise<readonly string[]>
   disconnect(): Promise<void>
   signTransaction(
     transaction: Uint8Array,

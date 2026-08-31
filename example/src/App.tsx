@@ -245,9 +245,6 @@ function App() {
   const [selectedEvmNetwork, setSelectedEvmNetwork] = useState(EVM_NETWORK_EXAMPLES[0])
   const handleExampleNetworkModeChange = (mode: 'mainnet' | 'testnet') => {
     setExampleNetworkMode(mode)
-    if (mode === 'mainnet' && (activeProvider === 'solana' || activeProvider === 'near')) {
-      setActiveProvider('zcash')
-    }
     setSelectedEvmNetwork(current =>
       current.mode === mode ? current : (getEvmNetworkExamples(mode)[0] ?? current)
     )

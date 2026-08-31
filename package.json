@@ -35,14 +35,19 @@
       "types": "./dist/chains/near/index.d.ts",
       "import": "./dist/chains/near/index.mjs",
       "require": "./dist/chains/near/index.js"
+    },
+    "./chains/multichain": {
+      "types": "./dist/chains/multichain/index.d.ts",
+      "import": "./dist/chains/multichain/index.mjs",
+      "require": "./dist/chains/multichain/index.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts src/chains/solana/index.ts src/chains/near/index.ts --format cjs,esm --dts --out-dir dist --clean",
-    "dev": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts src/chains/solana/index.ts src/chains/near/index.ts --format cjs,esm --dts --out-dir dist --watch",
+    "build": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts src/chains/solana/index.ts src/chains/near/index.ts src/chains/multichain/index.ts --format cjs,esm --dts --out-dir dist --clean",
+    "dev": "tsup src/index.ts src/chains/zcash/index.ts src/chains/evm/index.ts src/chains/bitcoin/index.ts src/chains/solana/index.ts src/chains/near/index.ts src/chains/multichain/index.ts --format cjs,esm --dts --out-dir dist --watch",
     "type-check": "tsc --noEmit",
     "test": "pnpm run build && node --test tests/*.test.mjs",
     "test:network": "pnpm run build && node --test tests/evm-network.test.mjs",

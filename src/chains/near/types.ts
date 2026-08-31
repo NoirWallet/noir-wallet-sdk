@@ -67,6 +67,8 @@ export interface NearSignedMessage {
  */
 export interface NearProvider {
   requestSignIn(params?: NearRequestSignInParams): Promise<NearSignInResult>
+  /** Account IDs explicitly authorized for this site. The current account is first. */
+  getAccounts(): Promise<readonly string[]>
   signOut(): Promise<void>
   isSignedIn(): boolean
   getAccountId(): string | null

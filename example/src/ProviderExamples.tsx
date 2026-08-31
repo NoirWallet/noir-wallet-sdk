@@ -11,6 +11,7 @@ import {
   type BitcoinChainInfo,
   type BitcoinNetwork,
   type BitcoinProvider,
+  type Caip25Session,
   type EvmProvider,
   type NearProvider,
   type SolanaProvider
@@ -100,6 +101,111 @@ export function ProviderSwitcher({
   selectedEvmNetwork,
   onSelectEvmNetwork
 }: ExampleNavigationProps) {
+  const [session, setSession] = useState<Caip25Session | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(false)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const wallet = getNoirWallet()
+  const multichain = wallet?.multichain
+  useEffect(() => {
+    if (!multichain) return
+    let active = true
+    const applySession = (next: Caip25Session | null) => {
+      if (active) setSession(next && Object.keys(next.scopes).length > 0 ? next : null)
+    }
+    const handleSessionChanged = (next: Caip25Session) => applySession(next)
+    multichain.on('wallet_sessionChanged', handleSessionChanged)
+    void multichain
+      .getSession()
+      .then(applySession)
+      .catch(() => {})
+    return () => {
+      active = false
+      multichain.removeListener('wallet_sessionChanged', handleSessionChanged)
+    }
+  }, [multichain])
+
+  const createMultichainSession = async () => {
+    if (!multichain) return
+    setSessionLoading(true)
+    setSessionError(null)
+    try {
+      const zcashChainId =
+        networkMode === 'mainnet'
+          ? 'bip122:00040fe8ec8471911baa1db1266ea15d'
+          : 'bip122:05a60a92d99d85997cce3b87616c089f'
+      const bitcoinChainId =
+        networkMode === 'mainnet'
+          ? 'bip122:000000000019d6689c085ae165831e93'
+          : 'bip122:000000000933ea01ad0ee984209779ba'
+      const solanaChainId =
+        networkMode === 'mainnet'
+          ? 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
+          : 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1'
+      const nearChainId = networkMode === 'mainnet' ? 'near:mainnet' : 'near:testnet'
+      const evmChainId = `eip155:${Number.parseInt(selectedEvmNetwork.request.chainId, 16)}`
+      const next = await multichain.createSession({
+        scopes: {
+          [zcashChainId]: {
+            methods: [
+              'zcash_getAccounts',
+              'zcash_getBalance',
+              'zcash_sendTransaction',
+              'zcash_signMessage'
+            ],
+            notifications: ['wallet_sessionChanged', 'accountsChanged']
+          },
+          [evmChainId]: {
+            methods: [
+              'eth_accounts',
+              'eth_sendTransaction',
+              'personal_sign',
+              'eth_signTypedData_v4'
+            ],
+            notifications: ['wallet_sessionChanged', 'accountsChanged', 'chainChanged']
+          },
+          [bitcoinChainId]: {
+            methods: ['getAccounts', 'getBalance', 'sendBitcoin', 'signMessage', 'signPsbt'],
+            notifications: ['wallet_sessionChanged', 'accountsChanged', 'networkChanged']
+          },
+          [solanaChainId]: {
+            methods: [
+              'getAccounts',
+              'signTransaction',
+              'signAllTransactions',
+              'signAndSendTransaction',
+              'signMessage'
+            ],
+            notifications: ['wallet_sessionChanged', 'accountsChanged']
+          },
+          [nearChainId]: {
+            methods: ['getAccounts', 'signTransaction', 'requestSignTransactions', 'signMessage'],
+            notifications: ['wallet_sessionChanged', 'accountsChanged']
+          }
+        },
+        properties: { application: 'Noir Wallet SDK Example V2' }
+      })
+      setSession(next)
+    } catch (error) {
+      setSessionError(formatError(error))
+    } finally {
+      setSessionLoading(false)
+    }
+  }
+
+  const revokeMultichainSession = async () => {
+    if (!multichain) return
+    setSessionLoading(true)
+    setSessionError(null)
+    try {
+      await multichain.revokeSession()
+      setSession(null)
+    } catch (error) {
+      setSessionError(formatError(error))
+    } finally {
+      setSessionLoading(false)
+    }
+  }
+
   const options = [
     {
       id: 'zcash' as const,
@@ -126,6 +232,36 @@ export function ProviderSwitcher({
   ]
   return (
     <nav className="provider-network-nav" aria-label="Provider examples">
+      <div className="multichain-session-bar">
+        <div>
+          <strong>CAIP-25 multichain session</strong>
+          <span>
+            {session
+              ? `${Object.keys(session.scopes).length} networks authorized`
+              : 'Connect once, then use every authorized provider.'}
+          </span>
+          {sessionError && <span className="multichain-session-error">{sessionError}</span>}
+        </div>
+        {session ? (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={sessionLoading}
+            onClick={() => void revokeMultichainSession()}
+          >
+            Revoke session
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!multichain || sessionLoading}
+            onClick={() => void createMultichainSession()}
+          >
+            {sessionLoading ? 'Connecting…' : 'Connect all networks'}
+          </button>
+        )}
+      </div>
       <div className="provider-network-nav-heading">
         <div>
           <span className="section-kicker">Provider examples</span>
@@ -280,12 +416,52 @@ function Result({ label, value }: { label: string; value: string }) {
   )
 }
 
+function AuthorizedAccountsExample({
+  accounts,
+  busy,
+  onReview
+}: {
+  accounts: readonly string[]
+  busy: boolean
+  onReview: () => void
+}) {
+  return (
+    <section className="card card-compact">
+      <h2>Batch account authorization</h2>
+      <p className="card-hint">
+        The current account is selected by default. Review the connection to authorize more wallets
+        for this site.
+      </p>
+      {accounts.length === 0 ? (
+        <p className="field-help">No accounts authorized.</p>
+      ) : (
+        <div className="batch-list">
+          {accounts.map((address, index) => (
+            <div className="batch-item" key={address}>
+              <div className="batch-item-header">
+                <span className="batch-label">
+                  {index === 0 ? 'Current account' : `Account ${index + 1}`}
+                </span>
+              </div>
+              <code className="result-code">{address}</code>
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="btn btn-secondary btn-full" disabled={busy} onClick={onReview}>
+        Review authorized accounts
+      </button>
+    </section>
+  )
+}
+
 export function EvmExample({ navigation }: { navigation: ExampleNavigationProps }) {
   const [provider, setProvider] = useState<EvmProvider | null>(
     () => getNoirWallet()?.ethereum ?? null
   )
   const [chainId, setChainId] = useState('')
   const [account, setAccount] = useState('')
+  const [accounts, setAccounts] = useState<readonly string[]>([])
   const [balance, setBalance] = useState('')
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
@@ -314,6 +490,7 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
       current.request<readonly string[]>({ method: 'eth_accounts' })
     ])
     const nextAccount = accounts[0] ?? ''
+    setAccounts(accounts)
     setChainId(nextChainId)
     setAccount(nextAccount)
     setContractAddress(value => {
@@ -337,6 +514,7 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
     const onAccountsChanged = (value: unknown) => {
       const accounts = Array.isArray(value) ? value.filter(item => typeof item === 'string') : []
       setAccount(accounts[0] ?? '')
+      setAccounts(accounts)
       void refresh(provider).catch(refreshError => setError(formatError(refreshError)))
     }
     const onChainChanged = (value: unknown) => {
@@ -396,6 +574,16 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
         params: [{ eth_accounts: {} }]
       })
       return 'EVM permission revoked.'
+    })
+
+  const reviewAccounts = () =>
+    run(async () => {
+      if (!provider) throw new Error('Noir Wallet EVM provider is unavailable.')
+      await provider.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }]
+      })
+      return 'EVM account authorization updated.'
     })
 
   const sendTransaction = (event: FormEvent) => {
@@ -541,6 +729,11 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
             </button>
           </details>
         </section>
+        <AuthorizedAccountsExample
+          accounts={accounts}
+          busy={busy}
+          onReview={() => void reviewAccounts()}
+        />
         <section className="card card-compact">
           <h2>Send native asset</h2>
           <form className="form-stack" onSubmit={sendTransaction}>
@@ -694,6 +887,7 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
   const [network, setNetwork] = useState<BitcoinNetwork | ''>('')
   const [chain, setChain] = useState<BitcoinChainInfo | null>(null)
   const [account, setAccount] = useState('')
+  const [accounts, setAccounts] = useState<readonly string[]>([])
   const [publicKey, setPublicKey] = useState('')
   const [balance, setBalance] = useState<BitcoinBalance | null>(null)
   const [recipient, setRecipient] = useState('')
@@ -723,6 +917,7 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
       current.getAccounts()
     ])
     const nextAccount = accounts[0] ?? ''
+    setAccounts(accounts)
     setNetwork(nextNetwork)
     setChain(nextChain)
     setAccount(nextAccount)
@@ -911,6 +1106,11 @@ export function BitcoinExample({ navigation }: { navigation: ExampleNavigationPr
             Noir Wallet settings.
           </p>
         </section>
+        <AuthorizedAccountsExample
+          accounts={accounts}
+          busy={busy}
+          onReview={() => void connect()}
+        />
         <section className="card card-compact">
           <h2>Send Bitcoin</h2>
           <form className="form-stack" onSubmit={sendBitcoin}>
@@ -1011,6 +1211,7 @@ export function NativeTransferExample({
   const walletProvider = getNoirWallet()?.[chain] ?? null
   const [provider, setProvider] = useState<NativeExampleProvider | null>(walletProvider)
   const [account, setAccount] = useState('')
+  const [accounts, setAccounts] = useState<readonly string[]>([])
   const [serializedTransaction, setSerializedTransaction] = useState('')
   const [message, setMessage] = useState('Hello Noir Wallet')
   const [nearReceiver, setNearReceiver] = useState('')
@@ -1038,11 +1239,9 @@ export function NativeTransferExample({
 
   const refresh = useCallback(
     async (current: NativeExampleProvider) => {
-      setAccount(
-        chain === 'solana'
-          ? ((current as SolanaProvider).publicKey?.toString() ?? '')
-          : ((current as NearProvider).getAccountId() ?? '')
-      )
+      const authorized = await current.getAccounts()
+      setAccounts(authorized)
+      setAccount(authorized[0] ?? '')
     },
     [chain]
   )
@@ -1157,6 +1356,21 @@ export function NativeTransferExample({
             Balance and token reads use the dApp&apos;s own {displayName} RPC client.
           </p>
         </section>
+        <AuthorizedAccountsExample
+          accounts={accounts}
+          busy={busy}
+          onReview={() =>
+            void run(async () => {
+              if (!provider) throw new Error(`${displayName} provider is unavailable.`)
+              if (chain === 'solana') {
+                await (provider as SolanaProvider).connect()
+              } else {
+                await (provider as NearProvider).requestSignIn()
+              }
+              return `${displayName} account authorization updated.`
+            })
+          }
+        />
         {chain === 'near' && (
           <section className="card card-compact">
             <h2>Sign NEAR function call</h2>

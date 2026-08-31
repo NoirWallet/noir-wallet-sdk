@@ -5,10 +5,13 @@ import type { BitcoinProvider } from './chains/bitcoin/types'
 import type { EvmProvider } from './chains/evm/types'
 import type { SolanaProvider } from './chains/solana/types'
 import type { NearProvider } from './chains/near/types'
+import type { MultichainProvider, MultichainRequestArguments } from './chains/multichain/types'
 
 interface RawNoirWallet {
   isNoirWallet: true
   version?: string
+  request?: <T = unknown>(args: MultichainRequestArguments) => Promise<T>
+  multichain?: MultichainProvider
   zcash: ZcashProvider
   ethereum?: EvmProvider
   bitcoin?: BitcoinProvider
@@ -36,6 +39,8 @@ export function getNoirWallet(): NoirWalletProvider | null {
   return {
     isNoirWallet: rawWallet.isNoirWallet,
     version: rawWallet.version,
+    ...(rawWallet.request ? { request: rawWallet.request.bind(rawWallet) } : {}),
+    ...(rawWallet.multichain ? { multichain: rawWallet.multichain } : {}),
     zcash: new ZcashClient(rawWallet.zcash),
     ...(rawWallet.ethereum ? { ethereum: rawWallet.ethereum } : {}),
     ...(rawWallet.bitcoin ? { bitcoin: rawWallet.bitcoin } : {}),
