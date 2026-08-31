@@ -8,6 +8,7 @@ export type {
   BitcoinProvider,
   BitcoinProviderListener,
   BitcoinRequestArguments,
+  BitcoinSendOptions,
   BitcoinSignPsbtOptions,
   DetectBitcoinProviderOptions
 } from './types'

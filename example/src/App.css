@@ -111,6 +111,32 @@
   background: rgba(16, 19, 27, 0.72);
 }
 
+.multichain-session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 36%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+
+.multichain-session-bar > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.multichain-session-bar span {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.multichain-session-bar .multichain-session-error {
+  color: var(--color-danger);
+}
+
 .provider-network-nav-heading {
   display: flex;
   align-items: center;
