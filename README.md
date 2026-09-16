@@ -76,7 +76,7 @@ if (!accounts) {
 const balance = await zcash.getBalance()
 console.log('Transparent:', balance.transparent, 'ZEC')
 console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
+console.log('Available:', balance.available, 'ZEC') // Display balance, including pending funds
 
 // Get public key
 const publicKeyInfo = await zcash.getPublicKey()
@@ -206,7 +206,7 @@ Get wallet balance.
 // Primary account balance (backward compatible)
 const balance = await zcash.getBalance()
 console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Destination-agnostic fallback
+console.log('Available:', balance.available, 'ZEC') // Display balance, including pending funds
 
 // Per-wallet balances
 balance.accounts.forEach(b => {
@@ -222,7 +222,8 @@ const second = await zcash.getBalance(balance.accounts[1]?.id)
 - `transparent`: Transparent address balance
 - `shielded`: Shielded balance (Sapling + Orchard)
 - `total`: Total balance (transparent + shielded)
-- `available`: A destination-agnostic, cached compatibility value. It does not account for the final recipient, memo, selected fee tier, or exact transaction action count. Use `getMaxTransfer()` for an exact Max value once those inputs are known.
+- `available`: Display balance, including funds that are still pending.
+- `spendable`: Amount currently selectable before destination-specific fees. Use `getMaxTransfer()` for an exact Max value once the recipient, memo, funding source, and fee tier are known.
 - `accounts`: Balance of every authorized account; each entry carries a `synced` flag (`false` = cached/zero fallback because the wallet is locked or that account hasn't synced yet).
 
 > **Multi-wallet access & compatibility:** `connect()` / `getAccounts()` / `getBalance()` are backward compatible — their original top-level fields are unchanged, and the `accounts` array is purely additive. dApps on **older extensions** that don't return `accounts` still work: the SDK normalizes the single-account response into a one-element `accounts` array, so your code path is identical regardless of extension version. To react to changes, listen for `accountsChanged` and re-call `getAccounts()` / `getBalance()` to refresh the array.
@@ -266,8 +267,8 @@ const txid = await zcash.sendTransaction({
 > **Compatibility:** `fundingSource` requires Noir Wallet extension **1.0.27 or
 > later**. Omit it to retain the existing shielded-only behavior. Do not request
 > transparent funding from an older extension because it does not understand the
-> parameter. Legacy dApps can continue using `balance.available`, but it is a
-> conservative fallback rather than an exact recipient-aware Max.
+> parameter. `balance.available` includes pending funds and must not be used as
+> an exact send limit; use `getMaxTransfer()` instead.
 
 #### `getPublicKey(options?)`
 
@@ -467,7 +468,8 @@ interface Balance {
   transparent: string
   shielded: string
   total?: string
-  available?: string // Destination-agnostic compatibility value
+  spendable?: string // Currently selectable before transaction-specific fees
+  available?: string // Display balance, including pending funds
 }
 
 // One account from a batch (multi-wallet) authorization.

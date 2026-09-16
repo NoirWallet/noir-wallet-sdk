@@ -19,7 +19,9 @@ export interface Balance {
   transparent: string
   shielded: string
   total?: string
+  /** Amount currently selectable before destination-specific fees. */
   spendable?: string
+  /** Display balance including funds that are still pending. */
   available?: string
 }
 
