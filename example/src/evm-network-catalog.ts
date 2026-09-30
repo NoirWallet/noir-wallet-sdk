@@ -202,8 +202,12 @@ export const EVM_NETWORK_EXAMPLES = Object.freeze([
   })
 ])
 
+export function getEvmNetworkExample(chainId: string): EvmNetworkExample | undefined {
+  return EVM_NETWORK_EXAMPLES.find(network => network.request.chainId === chainId)
+}
+
 export function getEvmNetworkExampleMode(chainId: string): EvmNetworkExample['mode'] | undefined {
-  return EVM_NETWORK_EXAMPLES.find(network => network.request.chainId === chainId)?.mode
+  return getEvmNetworkExample(chainId)?.mode
 }
 
 export function getEvmNetworkExamples(

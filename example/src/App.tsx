@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import {
   getNoirWallet,
   publicKeyToAddress,
@@ -240,22 +240,49 @@ function TxRow({
 }
 
 function App() {
-  const [activeProvider, setActiveProvider] = useState<ExampleProviderId>('zcash')
+  const [activeProvider, setActiveProvider] = useState<ExampleProviderId>(() => {
+    try {
+      const saved = window.sessionStorage.getItem('noir-example-active-provider')
+      return saved === 'evm' || saved === 'bitcoin' || saved === 'solana' || saved === 'near'
+        ? saved
+        : 'zcash'
+    } catch {
+      return 'zcash'
+    }
+  })
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem('noir-example-active-provider', activeProvider)
+    } catch {
+      // Session storage may be unavailable in a restricted browser context.
+    }
+  }, [activeProvider])
   const [exampleNetworkMode, setExampleNetworkMode] = useState<'mainnet' | 'testnet'>('mainnet')
   const [selectedEvmNetwork, setSelectedEvmNetwork] = useState(EVM_NETWORK_EXAMPLES[0])
-  const handleExampleNetworkModeChange = (mode: 'mainnet' | 'testnet') => {
+  const [evmSelectionVersion, setEvmSelectionVersion] = useState(0)
+  const handleExampleNetworkModeChange = useCallback((mode: 'mainnet' | 'testnet') => {
     setExampleNetworkMode(mode)
     setSelectedEvmNetwork(current =>
       current.mode === mode ? current : (getEvmNetworkExamples(mode)[0] ?? current)
     )
-  }
+  }, [])
+  const handleSelectEvmNetwork = useCallback((network: (typeof EVM_NETWORK_EXAMPLES)[number]) => {
+    setSelectedEvmNetwork(network)
+    setEvmSelectionVersion(version => version + 1)
+  }, [])
+  const handleSyncEvmNetwork = useCallback((network: (typeof EVM_NETWORK_EXAMPLES)[number]) => {
+    setExampleNetworkMode(network.mode)
+    setSelectedEvmNetwork(network)
+  }, [])
   const exampleNavigation: ExampleNavigationProps = {
     active: activeProvider,
     onChange: setActiveProvider,
     networkMode: exampleNetworkMode,
     onNetworkModeChange: handleExampleNetworkModeChange,
     selectedEvmNetwork,
-    onSelectEvmNetwork: setSelectedEvmNetwork
+    evmSelectionVersion,
+    onSelectEvmNetwork: handleSelectEvmNetwork,
+    onSyncEvmNetwork: handleSyncEvmNetwork
   }
   const [noirWallet, setNoirWallet] = useState(() => getNoirWallet())
   const isInstalled = !!noirWallet
