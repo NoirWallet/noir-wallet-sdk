@@ -19,6 +19,7 @@ import {
 import { encodeFunctionData, isAddress } from 'viem'
 import testContractDeployments from './evm-test-contracts.json'
 import {
+  getEvmNetworkExample,
   getEvmNetworkExamples,
   getExampleChainIconUrl,
   type EvmNetworkExample
@@ -67,7 +68,9 @@ export interface ExampleNavigationProps {
   networkMode: EvmNetworkExample['mode']
   onNetworkModeChange: (mode: EvmNetworkExample['mode']) => void
   selectedEvmNetwork: EvmNetworkExample
+  evmSelectionVersion: number
   onSelectEvmNetwork: (network: EvmNetworkExample) => void
+  onSyncEvmNetwork: (network: EvmNetworkExample) => void
 }
 
 export function ExampleChainIcon({
@@ -472,6 +475,8 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [networkReady, setNetworkReady] = useState(false)
+  const initialSelectionVersion = useRef(navigation.evmSelectionVersion)
 
   useEffect(() => {
     if (provider) return
@@ -484,15 +489,20 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
     return () => controller.abort()
   }, [provider])
 
-  const refresh = useCallback(async (current: EvmProvider) => {
+  const refresh = useCallback(async (current: EvmProvider, syncNavigation = false) => {
     const [nextChainId, accounts] = await Promise.all([
       current.request<string>({ method: 'eth_chainId' }),
       current.request<readonly string[]>({ method: 'eth_accounts' })
     ])
+    if (syncNavigation) {
+      const selected = getEvmNetworkExample(nextChainId)
+      if (selected) navigation.onSyncEvmNetwork(selected)
+    }
     const nextAccount = accounts[0] ?? ''
     setAccounts(accounts)
     setChainId(nextChainId)
     setAccount(nextAccount)
+    setNetworkReady(true)
     setContractAddress(value => {
       const preset = TEST_BENCH_DEPLOYMENTS[BigInt(nextChainId).toString()]?.NoirTestBench
       return preset ?? value
@@ -507,7 +517,7 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
           )
         : ''
     )
-  }, [])
+  }, [navigation.onSyncEvmNetwork])
 
   useEffect(() => {
     if (!provider) return
@@ -519,11 +529,13 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
     }
     const onChainChanged = (value: unknown) => {
       if (typeof value === 'string') setChainId(value)
-      void refresh(provider).catch(refreshError => setError(formatError(refreshError)))
+      void refresh(provider, true).catch(refreshError => setError(formatError(refreshError)))
     }
     provider.on('accountsChanged', onAccountsChanged)
     provider.on('chainChanged', onChainChanged)
-    void refresh(provider).catch(refreshError => setError(formatError(refreshError)))
+    void refresh(provider, initialSelectionVersion.current === 0).catch(refreshError =>
+      setError(formatError(refreshError))
+    )
     return () => {
       provider.removeListener('accountsChanged', onAccountsChanged)
       provider.removeListener('chainChanged', onChainChanged)
@@ -545,18 +557,32 @@ export function EvmExample({ navigation }: { navigation: ExampleNavigationProps 
     }
   }
 
-  const lastAutomaticSwitch = useRef('')
+  const lastHandledSelectionVersion = useRef(0)
   useEffect(() => {
+    const selectionVersion = navigation.evmSelectionVersion
+    if (
+      !provider ||
+      !networkReady ||
+      !chainId ||
+      selectionVersion === 0 ||
+      selectionVersion === lastHandledSelectionVersion.current
+    ) {
+      return
+    }
+    lastHandledSelectionVersion.current = selectionVersion
     const targetChainId = navigation.selectedEvmNetwork.request.chainId
-    if (!provider || !account || !chainId || chainId === targetChainId) return
-    const attemptKey = `${account}:${chainId}:${targetChainId}`
-    if (lastAutomaticSwitch.current === attemptKey) return
-    lastAutomaticSwitch.current = attemptKey
+    if (chainId === targetChainId) return
     void run(async () => {
-      await switchEvmChain(provider, targetChainId)
+      try {
+        await switchEvmChain(provider, targetChainId)
+      } catch (switchError) {
+        const active = getEvmNetworkExample(chainId)
+        if (active) navigation.onSyncEvmNetwork(active)
+        throw switchError
+      }
       return `Switched to ${navigation.selectedEvmNetwork.label}`
     })
-  }, [account, chainId, navigation.selectedEvmNetwork, provider])
+  }, [chainId, navigation.evmSelectionVersion, navigation.selectedEvmNetwork, networkReady, provider])
 
   const connect = () =>
     run(async () => {
