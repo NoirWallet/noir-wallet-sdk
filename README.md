@@ -5,16 +5,12 @@
 
 TypeScript SDK and example dApp for integrating with Noir Wallet.
 
-## Install
+## Local development
 
 ```bash
 pnpm install
-```
-
-## Build
-
-```bash
 pnpm build
+pnpm type-check
 pnpm --filter @noir-wallet/example build
 ```
 
@@ -28,15 +24,10 @@ pnpm example:dev
 
 Noir Wallet must be installed in the browser for wallet connection flows.
 
-> **Extension compatibility:** The optional `fundingSource` parameter for
-> `getMaxTransfer()` and `sendTransaction()` requires Noir Wallet extension
-> **1.0.27 or later**. When omitted, the SDK continues to use shielded funds.
+The optional `fundingSource` parameter for `getMaxTransfer()` and `sendTransaction()` requires
+Noir Wallet extension **1.0.27 or later**. Omit it on older builds to use shielded funding.
 
-## SDK API
-
-TypeScript SDK for integrating with Noir Wallet Chrome Extension.
-
-## Installation
+## Install the SDK
 
 ```bash
 npm install @noir-wallet/sdk
@@ -63,51 +54,15 @@ const zcash = noirWallet.zcash
 
 // Check existing connection (silent, no popup)
 const accounts = await zcash.getAccounts()
-
-// Connect wallet if not connected (shows popup)
-if (!accounts) {
-  const newAccounts = await zcash.connect()
-  console.log('Wallet connected:', newAccounts)
-} else {
+if (accounts) {
   console.log('Already connected:', accounts)
 }
 
-// Get balance
-const balance = await zcash.getBalance()
-console.log('Transparent:', balance.transparent, 'ZEC')
-console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Display balance, including pending funds
-
-// Get public key
-const publicKeyInfo = await zcash.getPublicKey()
-if (publicKeyInfo) {
-  console.log('Public Key:', publicKeyInfo.pubkey)
-  console.log('Address:', publicKeyInfo.address)
-}
-
-// Use the same funding source for Max and Send
-const fundingSource = 'transparent' as const
-
-// Calculate the exact Max after the destination, memo, and source are known
-const max = await zcash.getMaxTransfer({
-  to: 'u1XYZ...',
-  memo: 'Payment for services',
-  fundingSource
+document.querySelector('#connect')?.addEventListener('click', async () => {
+  const connection = await zcash.connect()
+  const balance = await zcash.getBalance()
+  console.log(connection.accounts, balance.available)
 })
-
-// Send transaction with optional memo
-const txid = await zcash.sendTransaction({
-  to: 'u1XYZ...',
-  amount: max.maxAmount,
-  memo: 'Payment for services',
-  fundingSource
-})
-console.log('Transaction sent:', txid)
-
-// Sign message
-const result = await zcash.signMessage('Hello World')
-console.log('Signature:', result.signature)
-console.log('Address:', result.address)
 ```
 
 ### Detect Provider
@@ -128,14 +83,12 @@ if (isNoirWalletInstalled()) {
 
 ```typescript
 const noirWallet = getNoirWallet()
+if (!noirWallet) throw new Error('Noir Wallet not installed')
 const zcash = noirWallet.zcash
-
-// Connect first
-await zcash.connect()
 
 // Listen to account changes (unlock/lock, switch account)
 zcash.on('accountsChanged', async addresses => {
-  if (!addresses) {
+  if (!addresses || Array.isArray(addresses)) {
     console.log('Wallet locked or disconnected')
     return
   }
@@ -143,11 +96,6 @@ zcash.on('accountsChanged', async addresses => {
   // Multi-wallet dApps: refresh the authorized account list
   const result = await zcash.getAccounts()
   console.log('Authorized wallets:', result?.accounts.length)
-})
-
-// Listen to chain/network changes
-zcash.on('chainChanged', chainInfo => {
-  console.log('Network changed:', chainInfo)
 })
 ```
 
@@ -159,7 +107,7 @@ All methods are available on `noirWallet.zcash`:
 
 #### `connect()`
 
-Request wallet connection (shows popup if not authorized). The approval screen lets the user authorize **one or several independent wallets** in a single action (MetaMask-style: the current account is preselected, more can be added).
+Request wallet connection. The approval screen opens on every call and lets the user authorize one or more accounts. The current account is preselected for a new connection.
 
 **Returns**: `Promise<ZcashConnectResult>` — the primary account's `transparent`/`shielded` addresses **plus** an `accounts` array listing every authorized wallet.
 
@@ -206,7 +154,7 @@ Get wallet balance.
 // Primary account balance (backward compatible)
 const balance = await zcash.getBalance()
 console.log('Shielded:', balance.shielded, 'ZEC')
-console.log('Available:', balance.available, 'ZEC') // Display balance, including pending funds
+console.log('Available:', balance.available, 'ZEC') // Selectable balance, excluding pending funds
 
 // Per-wallet balances
 balance.accounts.forEach(b => {
@@ -220,13 +168,15 @@ const second = await zcash.getBalance(balance.accounts[1]?.id)
 **Balance fields**:
 
 - `transparent`: Transparent address balance
-- `shielded`: Shielded balance (Sapling + Orchard)
+- `shielded`: Shielded balance (Sapling + Orchard + Ironwood)
 - `total`: Total balance (transparent + shielded)
-- `available`: Display balance, including funds that are still pending.
+- `available`: Amount currently available for selection, excluding pending funds.
 - `spendable`: Amount currently selectable before destination-specific fees. Use `getMaxTransfer()` for an exact Max value once the recipient, memo, funding source, and fee tier are known.
-- `accounts`: Balance of every authorized account; each entry carries a `synced` flag (`false` = cached/zero fallback because the wallet is locked or that account hasn't synced yet).
+- `accounts`: Balance of every authorized account; `synced: false` marks a zero fallback without current synced data. A locked wallet returns an empty `accounts` array.
 
-> **Multi-wallet access & compatibility:** `connect()` / `getAccounts()` / `getBalance()` are backward compatible — their original top-level fields are unchanged, and the `accounts` array is purely additive. dApps on **older extensions** that don't return `accounts` still work: the SDK normalizes the single-account response into a one-element `accounts` array, so your code path is identical regardless of extension version. To react to changes, listen for `accountsChanged` and re-call `getAccounts()` / `getBalance()` to refresh the array.
+> **Compatibility:** If the provider omits `accounts`, the SDK returns a one-element array with
+> `id: 'current'` and empty wallet and account IDs. Refresh authorization with `getAccounts()` after
+> `accountsChanged`.
 
 #### `getMaxTransfer(params)`
 
@@ -264,11 +214,11 @@ const txid = await zcash.sendTransaction({
 })
 ```
 
-> **Compatibility:** `fundingSource` requires Noir Wallet extension **1.0.27 or
-> later**. Omit it to retain the existing shielded-only behavior. Do not request
-> transparent funding from an older extension because it does not understand the
-> parameter. `balance.available` includes pending funds and must not be used as
-> an exact send limit; use `getMaxTransfer()` instead.
+> `balance.available` excludes pending funds but does not account for destination-specific fees,
+> dust, or transaction shape. Use `getMaxTransfer()` for a send-max estimate with the same
+> destination, memo, and funding source. The fee tier selected during approval may change the
+> final maximum. An estimate does not establish hardware signing support; Keystone cannot send
+> from transparent funds.
 
 #### `getPublicKey(options?)`
 
@@ -276,7 +226,7 @@ Get the public key of the transparent address.
 
 **Params** (optional):
 
-- `options.signingMode`: `'current'` (default) or `'derived'`
+- `options.signingMode`: `'current'` (default), `'derived'`, or `'legacy_index0'`
 
 **Returns**: `Promise<{ pubkey: string, address: string, signingMode: SigningMode, originAddress?: string } | null>`
 
@@ -291,11 +241,14 @@ const publicKeyInfo = await zcash.getPublicKey()
 
 // Derived: privacy-preserving key (unlinkable to main address)
 const derivedKey = await zcash.getPublicKey({ signingMode: 'derived' })
-console.log('Derived Key:', derivedKey.pubkey)
-console.log('Main Address:', derivedKey.originAddress)
+if (derivedKey) {
+  console.log('Derived Key:', derivedKey.pubkey)
+  console.log('Main Address:', derivedKey.originAddress)
+}
 ```
 
 **Note**: This method requires the wallet to be connected but does not trigger an unlock popup. Returns `null` if the wallet is locked.
+Ledger and Keystone accounts do not support public-key identity access through this API.
 
 #### `sendTransaction(params)`
 
@@ -304,17 +257,14 @@ Send a transaction using shielded funds by default, or explicitly select transpa
 **Params**:
 
 - `to: string` - Recipient address
-- `amount: string` - Amount in ZEC
+- `amount: string` - Positive decimal ZEC amount with at most 8 decimal places
 - `memo?: string` - Private memo (max 512 bytes UTF-8, shielded recipients only; not allowed for transparent recipients)
 - `fundingSource?: 'shielded' | 'transparent'` - Balance used to fund the transaction; defaults to `shielded`
 
-**Returns**: `Promise<string>` - Transaction ID
+**Returns**: `Promise<string>` - Transaction ID after broadcast and local recording
 
 > **Privacy:** Transparent funding reveals and may link the selected transparent
 > UTXOs on-chain. It is not supported by Keystone hardware wallets.
->
-> **Compatibility:** `fundingSource` is supported by Noir Wallet extension
-> **1.0.27 or later**.
 
 ```typescript
 const txid = await zcash.sendTransaction({
@@ -332,7 +282,7 @@ Sign a message with a transparent address key.
 **Params**:
 
 - `message: string` - Message to sign
-- `options.signingMode`: `'current'` (default) or `'derived'`
+- `options.signingMode`: `'current'` (default), `'derived'`, or `'legacy_index0'`
 
 **Returns**: `Promise<SignMessageResult>`
 
@@ -352,6 +302,9 @@ const derived = await zcash.signMessage('Hello World', { signingMode: 'derived' 
 console.log('Signature:', derived.signature)
 console.log('Origin Address:', derived.originAddress)
 ```
+
+Ledger and Keystone accounts do not support message signing through this API. Messages must be
+non-empty and at most 10,000 characters.
 
 #### `getAddresses()`
 
@@ -376,7 +329,9 @@ const txid = await zcash.shieldFunds()
 console.log('Shield transaction:', txid)
 ```
 
-> **Note**: This moves all transparent balance into the shielded pool for enhanced privacy. The user will see an approval popup.
+> **Note**: This shields currently eligible confirmed transparent funds after approval, subject to
+> the wallet's minimum threshold. Pending funds are excluded. Ledger completes signing in a
+> separate tab; Keystone cannot sign the transparent inputs required for shielding.
 
 #### `getTransactionHistory()`
 
@@ -384,11 +339,14 @@ Fetch transaction history from the wallet (includes on-chain and local pending t
 
 **Returns**: `Promise<TransactionHistoryEntry[]>`
 
+Returns the active account's newest entries first, or an empty array while locked.
+
 Each entry contains:
-- `txid`: Transaction hash (hex)
-- `type`: `'send'` | `'receive'` | `'shield'` | `'swap'` | `'lending_supply'` | `'lending_withdraw'` | `'lending_claim'`
+
+- `txid`: Transaction hash (hex), possibly empty for a locally pending transaction
+- `type`: Transaction category; lending actions use a `lending_` prefix.
 - `amount`: Amount in ZEC
-- `status`: `'mined'` | `'pending'` | `'failed'`
+- `status`: Transaction status; treat this as a display value rather than an exhaustive enum.
 - `timestamp`: Unix timestamp in milliseconds
 - `memo`: Optional memo string
 
@@ -399,9 +357,21 @@ history.forEach(tx => {
 })
 ```
 
-#### `switchNetwork(network)` *(deprecated)*
+#### `checkLendingMcaAccount()`
 
-> **Deprecated**: Mainnet and testnet are now separate extension builds. Install the testnet extension for testnet usage. This method is retained for backward compatibility but has no effect.
+Returns `Promise<LendingMcaStatus | null>`, with `mcaId`, `publicKey`, and `signingMode` (`'derived'`,
+`'legacy'`, or `'legacy_index0'`). It returns `null` while locked or without an active account.
+Ledger and Keystone accounts do not support this identity method.
+
+#### `disconnect()`
+
+Returns `Promise<void>`. Revokes this site's authorization and emits `accountsChanged` with `null`;
+it does not lock the wallet or disconnect other sites.
+
+#### `switchNetwork(network)` _(deprecated)_
+
+> **Deprecated**: This method always throws. Mainnet and testnet are separate extension builds;
+> install the appropriate extension instead.
 
 ### Utility Functions
 
@@ -422,11 +392,13 @@ Convert a public key to a Zcash transparent address.
 import { publicKeyToAddress } from '@noir-wallet/sdk'
 
 // Get public key from wallet
-const { pubkey } = await zcash.getPublicKey()
+const identity = await zcash.getPublicKey()
 
 // Convert to address for verification
-const address = publicKeyToAddress(pubkey, 'mainnet')
-console.log('Address:', address)
+if (identity) {
+  const address = publicKeyToAddress(identity.pubkey, 'mainnet')
+  console.log('Address:', address)
+}
 
 // Convert external public key
 const externalPubkey = '03a1b2c3d4e5f6...'
@@ -440,19 +412,20 @@ const externalAddress = publicKeyToAddress(externalPubkey, 'mainnet')
 
 **Note**: This function implements the Bitcoin/Zcash P2PKH address generation algorithm (SHA256 → RIPEMD160 → Base58Check).
 
+#### `verifyMessageSignature(params)`
+
+Verifies a Zcash signed message locally. Pass `message` and `signature`, with optional `pubkey`,
+`address`, and `network` (`'mainnet'` by default). The result includes `valid`,
+`recoveredPubkey`, and `recoveredAddress`; optional key and address match fields appear when those
+values are supplied. Invalid input returns `valid: false` and an `error` message.
+
 ### Events
 
 #### `accountsChanged`
 
 Triggered when accounts change (unlock/lock, switch account).
 
-**Data**: `ZcashAddress | null` - Current addresses (null if locked/disconnected)
-
-#### `chainChanged`
-
-Triggered when network changes.
-
-**Data**: `{ chainId: string, network: string }`
+**Data**: `ZcashAddress | [] | null` - Current addresses, `[]` when locked, or `null` when disconnected or the active account is unauthorized.
 
 > **Multi-wallet dApps:** there is no separate batch event. When `accountsChanged` fires, re-call `getAccounts()` (and `getBalance()`) to refresh the `accounts` array.
 
@@ -469,7 +442,7 @@ interface Balance {
   shielded: string
   total?: string
   spendable?: string // Currently selectable before transaction-specific fees
-  available?: string // Display balance, including pending funds
+  available?: string // Selectable balance, excluding pending funds
 }
 
 // One account from a batch (multi-wallet) authorization.
@@ -483,7 +456,7 @@ interface ZcashAccount {
 }
 
 // Balance for one authorized account.
-// `synced: false` means a cached/zero fallback (locked or not yet synced).
+// `synced: false` means a zero fallback without current synced data.
 interface ZcashAccountBalance {
   id: string
   walletId: string
@@ -506,6 +479,7 @@ interface SendTransactionParams {
   to: string
   amount: string
   memo?: string // Private memo (max 512 bytes UTF-8)
+  fundingSource?: 'shielded' | 'transparent'
 }
 
 type FeeTier = 'standard' | 'fast'
@@ -514,6 +488,7 @@ interface MaxTransferParams {
   to: string
   memo?: string
   feeTier?: FeeTier
+  fundingSource?: 'shielded' | 'transparent'
 }
 
 interface MaxTransferEstimate {
@@ -523,14 +498,14 @@ interface MaxTransferEstimate {
 
 interface TransactionHistoryEntry {
   txid: string
-  type: string      // 'send' | 'receive' | 'shield' | 'swap' | 'lending_supply' | 'lending_withdraw' | 'lending_claim'
-  amount: string    // ZEC amount
-  status: string    // 'mined' | 'pending' | 'failed'
+  type: string
+  amount: string // ZEC amount
+  status: string
   timestamp: number // Unix ms
   memo?: string
 }
 
-type SigningMode = 'derived' | 'current'
+type SigningMode = 'derived' | 'current' | 'legacy_index0'
 
 interface SignMessageOptions {
   signingMode?: SigningMode // Default: 'current'
@@ -559,11 +534,7 @@ if (!noirWallet) {
 try {
   await noirWallet.zcash.connect()
 } catch (error) {
-  if (error.code === 4001) {
-    console.error('User rejected the request')
-  } else {
-    console.error('Connection failed:', error.message)
-  }
+  console.error('Connection failed:', error instanceof Error ? error.message : String(error))
 }
 ```
 

@@ -1,14 +1,16 @@
 # Contributing
 
-This repository is the public SDK and example mirror for Noir Wallet.
+This repository contains the Noir Wallet SDK and example app. The extension and documentation site
+live in the parent Noir Wallet repository, which includes this repository as a Git submodule.
 
 ## Development
 
 ```bash
 pnpm install
 pnpm build
+pnpm type-check
 pnpm --filter @noir-wallet/example build
 ```
 
-Pull requests are welcome here. Maintainers review public changes, apply accepted changes to the
-private monorepo, and sync this public repository from that source of truth.
+Run these commands from this repository's root. The parent repository references this repository's
+Git commit through the submodule; the former snapshot-sync command no longer exists there.
