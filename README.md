@@ -25,10 +25,10 @@ The SDK is browser-only. It does not create or custody wallets, and Noir Wallet 
 
 Mainnet and testnet are separate Noir Wallet extensions:
 
-| Network | Download | Use |
-| --- | --- | --- |
+| Network | Download                                                                                                  | Use                          |
+| ------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Mainnet | [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn) | Production apps and real ZEC |
-| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases) | Development and test ZEC |
+| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases)                                 | Development and test ZEC     |
 
 To install testnet:
 
@@ -129,13 +129,13 @@ if (selected) {
 }
 ```
 
-`synced: false` means the value is cached or unavailable because that account is locked or has not finished syncing.
+`synced: false` marks a zero fallback without current synced data. A locked wallet returns an empty `accounts` array.
 
 ### Amounts and available balance
 
 Amounts are decimal ZEC strings. Keep them as strings instead of converting them to JavaScript floating-point numbers.
 
-`getBalance().available` is a destination-agnostic estimate. It cannot account for the final recipient, memo, fee tier, or transaction action count. Use `getMaxTransfer()` when you need an exact Max value.
+`getBalance().available` is the amount currently available for selection, excluding pending funds. It cannot account for the final recipient, memo, fee tier, or transaction action count. Use `getMaxTransfer()` when you need a Max estimate for the same destination, memo, and funding source.
 
 ## Send ZEC
 
@@ -211,6 +211,8 @@ if (!verification.valid) {
 ```
 
 Available signing modes are `current`, `derived`, and `legacy_index0`. See the [Provider API reference](https://docs.zknoir.com/developers/provider-api) before choosing a compatibility mode.
+
+Ledger and Keystone accounts do not support message signing, public-key identity access, or lending identity methods through this API.
 
 ## Listen for account changes
 
@@ -293,6 +295,8 @@ The SDK normalizes older single-account responses into the current `accounts` ar
 ```bash
 pnpm install
 pnpm build
+pnpm type-check
+pnpm --filter @noir-wallet/example build
 pnpm example:dev
 ```
 
