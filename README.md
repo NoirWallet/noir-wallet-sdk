@@ -1,12 +1,17 @@
 # Noir Wallet SDK
 
+> **Development has moved to [NoirWallet/noir-wallet](https://github.com/NoirWallet/noir-wallet).**
+> Noir Wallet's source is now public, and the SDK is maintained in [`packages/sdk`](https://github.com/NoirWallet/noir-wallet/tree/main/packages/sdk).
+> Use the new repository for [current SDK documentation](https://github.com/NoirWallet/noir-wallet/blob/main/packages/sdk/README.md), [wallet releases](https://github.com/NoirWallet/noir-wallet/releases), and [non-security issues](https://github.com/NoirWallet/noir-wallet/issues).
+> This repository preserves earlier SDK source and wallet releases. The npm package remains `@noir-wallet/sdk`.
+
 Typed TypeScript SDK for connecting web apps to the Noir Wallet browser extension.
 
 - [Integration guide](https://docs.zknoir.com/developers)
 - [Provider API reference](https://docs.zknoir.com/developers/provider-api)
-- [Example dApp](https://github.com/NoirWallet/noir-wallet-sdk/tree/main/example)
+- [Example dApp](https://github.com/NoirWallet/noir-wallet/tree/main/packages/sdk/example)
 - [Install Noir Wallet for mainnet](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn)
-- [Download the testnet build](https://github.com/NoirWallet/noir-wallet-sdk/releases)
+- [Download the testnet build](https://github.com/NoirWallet/noir-wallet/releases)
 
 ## What the SDK does
 
@@ -28,7 +33,7 @@ Mainnet and testnet are separate Noir Wallet extensions:
 | Network | Download                                                                                                  | Use                          |
 | ------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Mainnet | [Chrome Web Store](https://chromewebstore.google.com/detail/noir-wallet/mfoghjbpfanobmnoemoepenjjcmfpmdn) | Production apps and real ZEC |
-| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet-sdk/releases)                                 | Development and test ZEC     |
+| Testnet | [GitHub Releases](https://github.com/NoirWallet/noir-wallet/releases)                                     | Development and test ZEC     |
 
 To install testnet:
 
@@ -38,7 +43,7 @@ To install testnet:
 4. Open `chrome://extensions`, enable **Developer mode**, and select **Load unpacked**.
 5. Choose the extracted extension directory and confirm the installed name is **[Testnet] Noir Wallet**.
 
-Only install testnet ZIP files published by the `NoirWallet/noir-wallet-sdk` repository. The mainnet asset does not contain `-testnet` in its filename.
+Only install testnet ZIP files published by the `NoirWallet/noir-wallet` repository. The mainnet asset does not contain `-testnet` in its filename.
 
 The builds use different extension IDs and isolated wallet data. The SDK does not switch networks at runtime; `switchNetwork()` is deprecated and always throws.
 
@@ -292,12 +297,16 @@ The SDK normalizes older single-account responses into the current `accounts` ar
 
 ## Run the example locally
 
+Use the current SDK and example from the Noir Wallet repository:
+
 ```bash
+git clone https://github.com/NoirWallet/noir-wallet.git
+cd noir-wallet
 pnpm install
-pnpm build
-pnpm type-check
+pnpm --filter @noir-wallet/sdk build
+pnpm --filter @noir-wallet/sdk type-check
 pnpm --filter @noir-wallet/example build
-pnpm example:dev
+pnpm dev:example
 ```
 
 The example dApp requires Noir Wallet to be installed in the same browser.
